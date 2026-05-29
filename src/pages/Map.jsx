@@ -52,14 +52,28 @@ export default function Map() {
       <motion.div 
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="flex-1 w-full min-h-[75vh] border-4 border-black bg-black rounded shadow-2xl overflow-hidden relative group"
+        className="flex-1 w-full min-h-[60vh] border-4 border-black bg-[#1e1e1e] flex flex-col items-center justify-center p-8 text-center shadow-2xl relative"
       >
-        <iframe 
-          src={mapUrl} 
-          title="Minecraft Live Map"
-          className="w-full h-full border-0 absolute inset-0"
-          allowFullScreen
-        ></iframe>
+        <div className="absolute inset-0 opacity-10 bg-[url('https://minecraft.wiki/images/Stone_Bricks.png')] bg-repeat" style={{ backgroundSize: '64px 64px' }}></div>
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-red-500/20 text-red-400 p-4 border-2 border-red-500 mb-8 max-w-lg font-sans text-sm">
+            <h3 className="font-minecraft text-red-500 text-lg mb-2 uppercase flex items-center justify-center gap-2">
+              <Info size={18} /> Browser Security Notice
+            </h3>
+            <p>Your browser automatically blocks embedding the Live Map directly on this page because the website is secured with <strong>HTTPS</strong>, but your Minecraft server map uses <strong>HTTP</strong>.</p>
+            <p className="mt-2">To view the map safely, click the button below to open it in a new tab!</p>
+          </div>
+
+          <a 
+            href={mapUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mc-button mc-button-primary text-xl px-12 py-6 animate-pulse hover:animate-none"
+          >
+            <MapIcon className="inline-block mr-3" size={28} />
+            OPEN LIVE MAP IN NEW TAB
+          </a>
+        </div>
       </motion.div>
     </div>
   );
