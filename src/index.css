@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-minecraft: 'Press Start 2P', monospace;
+
+  --color-mc-dirt: #866043;
+  --color-mc-grass: #5B8731;
+  --color-mc-stone: #7D7D7D;
+  --color-mc-dark: #1E1E1E;
+  --color-mc-light: #E0E0E0;
+  
+  --color-mc-btn-top: #737373;
+  --color-mc-btn-bottom: #313131;
+  --color-mc-btn-left: #5A5A5A;
+  --color-mc-btn-right: #5A5A5A;
+  --color-mc-btn-face: #C6C6C6;
+  --color-mc-btn-text: #3C3C3C;
+  --color-mc-btn-hover: #7E92EB;
+}
+
+@layer base {
+  body {
+    @apply bg-mc-dark text-mc-light font-sans overflow-x-hidden;
+    background-image: url('data:image/svg+xml;utf8,<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" fill="%23222222"/><rect x="32" width="32" height="32" fill="%231a1a1a"/><rect y="32" width="32" height="32" fill="%231a1a1a"/><rect x="32" y="32" width="32" height="32" fill="%23222222"/></svg>');
+    background-repeat: repeat;
+    background-size: 64px 64px;
+  }
+}
+
+@layer components {
+  .mc-button {
+    @apply relative inline-flex items-center justify-center px-6 py-3 font-minecraft text-sm sm:text-base uppercase tracking-widest text-white active:scale-95;
+    background-color: #585858;
+    border: 2px solid #000;
+    box-shadow: inset -2px -4px 0px rgba(0,0,0,0.5), inset 2px 2px 0px rgba(255,255,255,0.25);
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mc-button:hover {
+    @apply bg-[#717171];
+    transform: translateY(-4px);
+    box-shadow: inset -2px -4px 0px rgba(0,0,0,0.5), inset 2px 2px 0px rgba(255,255,255,0.25), 0px 6px 15px rgba(0,0,0,0.5);
+  }
+  
+  .mc-button-primary {
+    @apply bg-[#3c8527];
+    box-shadow: inset -2px -4px 0px rgba(0,0,0,0.5), inset 2px 2px 0px rgba(255,255,255,0.4);
+  }
+  
+  .mc-button-primary:hover {
+    @apply bg-[#4d9e35];
+    box-shadow: inset -2px -4px 0px rgba(0,0,0,0.5), inset 2px 2px 0px rgba(255,255,255,0.4), 0px 6px 15px rgba(60,133,39,0.4);
+  }
+
+  .mc-panel {
+    @apply relative p-6 bg-black/60 backdrop-blur-sm border-2 border-[#3a3a3a];
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+  }
+}
