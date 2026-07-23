@@ -12,6 +12,64 @@ function notFound(app) {
   </div></div>`;
 }
 
+function galleryImages(mod) {
+  return [mod.image_url, ...(Array.isArray(mod.gallery) ? mod.gallery : [])].filter(Boolean);
+}
+
+function galleryHtml(mod) {
+  const images = galleryImages(mod);
+  if (!images.length) return mediaHtml(mod, "detail-media");
+  const controls =
+    images.length > 1
+      ? `
+        <button class="gallery-btn prev" id="g-prev" aria-label="Previous image">‹</button>
+        <button class="gallery-btn next" id="g-next" aria-label="Next image">›</button>
+        <span class="gallery-count" id="g-count">1 / ${images.length}</span>
+        <div class="gallery-dots">${images
+          .map((_, i) => `<button data-i="${i}" class="${i === 0 ? "active" : ""}" aria-label="Image ${i + 1}"></button>`)
+          .join("")}</div>`
+      : "";
+  return `
+    <div class="detail-media gallery" id="gallery">
+      <img src="${esc(images[0])}" alt="${esc(mod.title)}" id="gallery-img">
+      ${controls}
+    </div>`;
+}
+
+function wireGallery(app, mod) {
+  const images = galleryImages(mod);
+  if (images.length < 2) return;
+
+  let gi = 0;
+  const img = app.querySelector("#gallery-img");
+  const count = app.querySelector("#g-count");
+  const dots = [...app.querySelectorAll(".gallery-dots button")];
+
+  const show = (i) => {
+    gi = (i + images.length) % images.length;
+    img.classList.add("fading");
+    setTimeout(() => {
+      img.src = images[gi];
+      img.classList.remove("fading");
+    }, 150);
+    count.textContent = `${gi + 1} / ${images.length}`;
+    dots.forEach((d, di) => d.classList.toggle("active", di === gi));
+  };
+
+  app.querySelector("#g-prev").addEventListener("click", () => show(gi - 1));
+  app.querySelector("#g-next").addEventListener("click", () => show(gi + 1));
+  dots.forEach((d) => d.addEventListener("click", () => show(Number(d.dataset.i))));
+
+  // Arrow keys flip images too; listener retires when the route changes
+  const onKey = (e) => {
+    if (!document.getElementById("gallery")) return;
+    if (e.key === "ArrowLeft") show(gi - 1);
+    if (e.key === "ArrowRight") show(gi + 1);
+  };
+  document.addEventListener("keydown", onKey);
+  window.addEventListener("hashchange", () => document.removeEventListener("keydown", onKey), { once: true });
+}
+
 function buyButtonHtml(mod, owned, signedIn) {
   if (owned) {
     return `
@@ -54,7 +112,7 @@ export async function modView(app, { id }) {
     <div class="container">
       <div class="detail-grid">
         <div class="reveal">
-          ${mediaHtml(mod, "detail-media")}
+          ${galleryHtml(mod)}
           <div class="detail-desc" style="padding-top:36px">
             <h2>About this mod</h2>
             <p>${esc(mod.description ?? mod.tagline ?? "")}</p>
@@ -80,6 +138,8 @@ export async function modView(app, { id }) {
         </div>
       </div>
     </div>`;
+
+  wireGallery(app, mod);
 
   const goSignIn = () =>
     (location.hash = `#/auth?next=${encodeURIComponent(`#/mod/${mod.id}`)}`);

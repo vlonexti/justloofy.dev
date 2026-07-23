@@ -78,6 +78,18 @@ export async function adminView(app) {
               </div>
             </div>
           </div>
+          <div class="field">
+            <label>Showcase images (extra gallery pictures on the mod page — pick several at once)</label>
+            <div class="file-input">
+              <label class="btn btn-ghost btn-sm" for="f-gallery">🖼️ Choose images</label>
+              <span class="file-name ${Array.isArray(mod.gallery) && mod.gallery.length ? "chosen" : ""}" id="f-gallery-name">${
+                Array.isArray(mod.gallery) && mod.gallery.length
+                  ? `✓ ${mod.gallery.length} uploaded — pick files to replace them all`
+                  : "No files selected"
+              }</span>
+              <input id="f-gallery" type="file" accept="image/*" multiple>
+            </div>
+          </div>
           <div class="field-row" style="align-items:center;margin-bottom:18px">
             <label class="switch">
               <input type="checkbox" id="f-featured" ${mod.featured ? "checked" : ""}>
@@ -139,13 +151,16 @@ export async function adminView(app) {
       const input = app.querySelector(inputId);
       const nameEl = app.querySelector(nameId);
       input?.addEventListener("change", () => {
-        if (!input.files[0]) return;
-        nameEl.textContent = `✓ ${input.files[0].name}`;
+        const files = [...input.files];
+        if (!files.length) return;
+        nameEl.textContent =
+          files.length === 1 ? `✓ ${files[0].name}` : `✓ ${files.length} images selected`;
         nameEl.classList.add("chosen");
       });
     };
     wireFile("#f-image", "#f-image-name");
     wireFile("#f-file", "#f-file-name");
+    wireFile("#f-gallery", "#f-gallery-name");
 
     app.querySelector("#cancel-edit")?.addEventListener("click", () => {
       editing = null;
@@ -195,6 +210,16 @@ export async function adminView(app) {
       if (imageFile) {
         btn.textContent = "Uploading image…";
         record.image_url = await uploadModImage(imageFile);
+      }
+
+      const galleryFiles = [...app.querySelector("#f-gallery").files];
+      if (galleryFiles.length) {
+        const urls = [];
+        for (let i = 0; i < galleryFiles.length; i++) {
+          btn.textContent = `Uploading gallery ${i + 1}/${galleryFiles.length}…`;
+          urls.push(await uploadModImage(galleryFiles[i]));
+        }
+        record.gallery = urls;
       }
 
       const modFile = app.querySelector("#f-file").files[0];

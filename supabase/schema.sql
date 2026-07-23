@@ -67,6 +67,7 @@ create table public.mods (
   version text not null default '1.0.0',
   price_cents integer not null default 0 check (price_cents >= 0),
   image_url text,
+  gallery jsonb not null default '[]'::jsonb,  -- extra showcase image URLs
   file_path text,          -- path inside the private "mod-files" storage bucket
   featured boolean not null default false,
   published boolean not null default true,
