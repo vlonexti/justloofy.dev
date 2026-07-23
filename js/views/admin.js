@@ -250,7 +250,7 @@ export async function adminView(app) {
   if (!session) return denied("Sign in with your admin account to manage mods.");
   const profile = await getMyProfile().catch(() => null);
   if (!profile?.is_admin) {
-    return denied("This account isn't an admin. Run the make-yourself-admin SQL from the README.");
+    return denied("Your account doesn't have admin access.");
   }
   await reload();
 }

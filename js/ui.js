@@ -174,6 +174,7 @@ async function refreshAuthArea() {
   if (!area || !isLive) return;
   const session = await getSession();
   if (!session) {
+    document.querySelector('#main-nav a[href="#/admin"]')?.remove();
     area.innerHTML = `
       <a class="btn btn-ghost btn-sm" href="#/auth">Sign in</a>
       <a class="btn btn-primary btn-sm" href="#/auth?tab=signup">Sign up</a>`;
@@ -195,11 +196,14 @@ async function refreshAuthArea() {
     </a>`;
 
   const nav = document.getElementById("main-nav");
-  if (isAdmin && nav && !nav.querySelector('[href="#/admin"]')) {
+  const adminLink = nav?.querySelector('[href="#/admin"]');
+  if (isAdmin && nav && !adminLink) {
     const a = document.createElement("a");
     a.href = "#/admin";
     a.textContent = "Admin";
     nav.appendChild(a);
+  } else if (!isAdmin && adminLink) {
+    adminLink.remove();
   }
 }
 
