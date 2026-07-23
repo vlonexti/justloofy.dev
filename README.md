@@ -171,6 +171,22 @@ supabase/functions/                 the two Stripe edge functions
 CNAME                               tells GitHub Pages about justloofy.dev
 ```
 
+## "My keys are visible on GitHub — is that safe?"
+
+**Yes.** The two values in `js/config.js` (project URL + `anon` key) are *designed* to be
+public — every visitor's browser needs them to talk to Supabase, so they'd be visible on
+the live site even if the repo were private. Security comes from the Row Level Security
+rules in `schema.sql`, which the database enforces no matter who holds the anon key.
+
+What must **NEVER** be committed to this repo:
+- the Supabase **service_role** key
+- your Stripe **secret key** (`sk_live_...` / `sk_test_...`)
+- the Stripe **webhook secret** (`whsec_...`)
+
+Those three live only in Supabase's secret store (`supabase secrets set ...`) — they are
+never in any file in this folder. Also note: GitHub Pages on a free account requires the
+repo to be public anyway, and that's perfectly fine for a site like this.
+
 ## Heads-up on selling mods
 
 Some games' EULAs prohibit selling mods (Bethesda and Mojang are famously strict). Worth a quick check per game before you list paid mods — free mods with a "pay what you want" or Patreon link are usually the safe alternative where selling isn't allowed.

@@ -14,7 +14,13 @@ async function init() {
 
     grid.innerHTML = toShow.length
       ? toShow.map(modCardHtml).join("")
-      : `<div class="empty"><div class="big">🌒</div>No mods published yet — check back soon!</div>`;
+      : `<div class="empty" style="grid-column:1/-1"><div class="big">🌒</div>First drops are in the works — check back soon!</div>`;
+
+    // An empty store shouldn't brag about zero downloads
+    if (!all.length) {
+      document.getElementById("hero-stats").style.display = "none";
+      return;
+    }
 
     animateCount(document.getElementById("stat-mods"), all.length, { format: String });
     animateCount(

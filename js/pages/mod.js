@@ -24,7 +24,8 @@ function buyButtonHtml(mod, owned, signedIn) {
   if (mod.price_cents === 0) {
     return `<button class="btn btn-primary btn-block" id="claim-btn">${signedIn ? "Add to library — Free" : "Sign in to get it free"}</button>`;
   }
-  return `<button class="btn btn-primary btn-block" id="buy-btn">${signedIn ? `Buy now — ${money(mod.price_cents)}` : "Sign in to buy"}</button>`;
+  return `<button class="btn btn-primary btn-block" id="buy-btn">${signedIn ? `Buy now — ${money(mod.price_cents)}` : "Sign in to buy"}</button>
+    <p class="secure-note">🔒 Secure checkout powered by Stripe</p>`;
 }
 
 async function render() {

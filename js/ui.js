@@ -51,13 +51,18 @@ export function mediaHtml(mod, cssClass = "card-media") {
 
 export function modCardHtml(mod) {
   const badge = mod.featured ? `<span class="card-badge">Featured</span>` : "";
-  const media = mediaHtml(mod).replace('">', `">${badge}`);
+  const cta = `<span class="card-cta">View mod →</span>`;
+  const media = mediaHtml(mod).replace('">', `">${badge}${cta}`);
   return `
     <a class="mod-card reveal" href="mod.html?id=${encodeURIComponent(mod.id)}">
       ${media}
       <div class="card-body">
         <h3>${esc(mod.title)}</h3>
         <p class="tagline">${esc(mod.tagline ?? "")}</p>
+        <div class="card-meta">
+          <span>⬇ ${(mod.downloads ?? 0).toLocaleString()} downloads</span>
+          <span>v${esc(mod.version ?? "1.0.0")}</span>
+        </div>
         <div class="card-foot">
           <span class="price ${mod.price_cents === 0 ? "free" : ""}">${money(mod.price_cents)}</span>
           <span class="game-tag">${esc(mod.game)}</span>
@@ -156,7 +161,7 @@ export async function renderChrome() {
             </ul>
           </div>
         </div>
-        <div class="footer-bottom">© ${new Date().getFullYear()} ${esc(CONFIG.SITE_NAME)} · justloofy.dev</div>
+        <div class="footer-bottom">© ${new Date().getFullYear()} ${esc(CONFIG.SITE_NAME)} · justloofy.dev · 🔒 Payments secured by Stripe</div>
       </footer>`;
   }
 }
