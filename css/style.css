@@ -858,10 +858,11 @@ label {
 
 /* ---------- Motion & animations ---------- */
 
-main { animation: page-in 0.45s ease both; }
+#app.route-in { animation: page-in 0.4s ease both; }
 @keyframes page-in {
   from { opacity: 0; transform: translateY(8px); }
 }
+#app { min-height: 60vh; }
 
 /* Scroll-reveal (elements with .reveal get .in when scrolled into view) */
 .reveal { opacity: 0; }

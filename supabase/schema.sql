@@ -166,6 +166,13 @@ create policy "Buyers can read mod files"
     )
   );
 
+-- ---------- Live updates (realtime) ----------
+-- Lets the site update instantly when mods change or purchases land,
+-- without anyone refreshing the page.
+
+alter publication supabase_realtime add table public.mods;
+alter publication supabase_realtime add table public.purchases;
+
 -- ============================================================
 -- AFTER RUNNING THIS: make yourself the admin.
 -- 1. Sign up on your site with your email.

@@ -54,7 +54,7 @@ export function modCardHtml(mod) {
   const cta = `<span class="card-cta">View mod →</span>`;
   const media = mediaHtml(mod).replace('">', `">${badge}${cta}`);
   return `
-    <a class="mod-card reveal" href="mod.html?id=${encodeURIComponent(mod.id)}">
+    <a class="mod-card reveal" href="#/mod/${encodeURIComponent(mod.id)}">
       ${media}
       <div class="card-body">
         <h3>${esc(mod.title)}</h3>
@@ -90,38 +90,41 @@ export function toast(message, type = "") {
 // ---------- Header / footer ----------
 
 const NAV_LINKS = [
-  { href: "index.html", label: "Home" },
-  { href: "mods.html", label: "Mods" },
+  { href: "#/", label: "Home", path: "/" },
+  { href: "#/mods", label: "Mods", path: "/mods" },
 ];
 
-function currentPage() {
-  const path = location.pathname.split("/").pop();
-  return path === "" ? "index.html" : path;
+/** Highlight the nav link matching the current route (called by the router). */
+export function setActiveNav(path) {
+  document.querySelectorAll(".main-nav a").forEach((a) => {
+    const linkPath = (a.getAttribute("href") ?? "").replace(/^#/, "").split("?")[0];
+    a.classList.toggle("active", linkPath === path);
+  });
+}
+
+export function closeMobileNav() {
+  document.getElementById("main-nav")?.classList.remove("open");
 }
 
 export async function renderChrome() {
   const header = document.getElementById("site-header");
   const footer = document.getElementById("site-footer");
-  const page = currentPage();
 
   if (header) {
-    const links = NAV_LINKS.map(
-      (l) =>
-        `<a href="${l.href}" class="${page === l.href ? "active" : ""}">${l.label}</a>`
-    ).join("");
+    const links = NAV_LINKS.map((l) => `<a href="${l.href}">${l.label}</a>`).join("");
 
     header.innerHTML = `
       ${isLive ? "" : `<div class="demo-banner"><b>Demo mode</b> — sample data shown. Connect Supabase &amp; Stripe (see README) to go live.</div>`}
       <div class="site-header">
         <div class="container header-inner">
-          <a class="logo" href="index.html">
+          <a class="logo" href="#/">
             <img src="assets/favicon.svg" alt="">
             Just<span>Loofy</span>
           </a>
           <nav class="main-nav" id="main-nav">${links}</nav>
           <div class="header-actions" id="auth-area">
-            <a class="btn btn-ghost btn-sm" href="auth.html">Sign in</a>
-            <a class="btn btn-primary btn-sm" href="auth.html#signup">Sign up</a>
+            <a class="btn btn-ghost btn-sm" href="#/auth">Sign in</a>
+            <a class="btn btn-primary btn-sm" href="#/auth?tab=signup">Sign up</a>
           </div>
           <button class="nav-toggle" id="nav-toggle" aria-label="Menu">☰</button>
         </div>
@@ -140,7 +143,7 @@ export async function renderChrome() {
       <footer class="site-footer">
         <div class="container footer-inner">
           <div>
-            <a class="logo" href="index.html" style="margin-bottom:14px">
+            <a class="logo" href="#/" style="margin-bottom:14px">
               <img src="assets/favicon.svg" alt=""> Just<span>Loofy</span>
             </a>
             <p>Handcrafted game mods, built with love and tested to death. New drops announced on the channel.</p>
@@ -148,9 +151,9 @@ export async function renderChrome() {
           <div>
             <h4>Store</h4>
             <ul>
-              <li><a href="mods.html">All mods</a></li>
-              <li><a href="account.html">My library</a></li>
-              <li><a href="auth.html">Sign in</a></li>
+              <li><a href="#/mods">All mods</a></li>
+              <li><a href="#/account">My library</a></li>
+              <li><a href="#/auth">Sign in</a></li>
             </ul>
           </div>
           <div>
@@ -172,8 +175,8 @@ async function refreshAuthArea() {
   const session = await getSession();
   if (!session) {
     area.innerHTML = `
-      <a class="btn btn-ghost btn-sm" href="auth.html">Sign in</a>
-      <a class="btn btn-primary btn-sm" href="auth.html#signup">Sign up</a>`;
+      <a class="btn btn-ghost btn-sm" href="#/auth">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="#/auth?tab=signup">Sign up</a>`;
     return;
   }
   let name = session.user.email;
@@ -186,17 +189,16 @@ async function refreshAuthArea() {
 
   const initial = esc(name[0]?.toUpperCase() ?? "?");
   area.innerHTML = `
-    ${isAdmin ? `<a class="btn btn-ghost btn-sm" href="admin.html">Admin</a>` : ""}
-    <a class="avatar-chip" href="account.html" title="My account">
+    ${isAdmin ? `<a class="btn btn-ghost btn-sm" href="#/admin">Admin</a>` : ""}
+    <a class="avatar-chip" href="#/account" title="My account">
       <span class="avatar">${initial}</span> ${esc(name)}
     </a>`;
 
   const nav = document.getElementById("main-nav");
-  if (isAdmin && nav && !nav.querySelector('[href="admin.html"]')) {
+  if (isAdmin && nav && !nav.querySelector('[href="#/admin"]')) {
     const a = document.createElement("a");
-    a.href = "admin.html";
+    a.href = "#/admin";
     a.textContent = "Admin";
-    if (currentPage() === "admin.html") a.classList.add("active");
     nav.appendChild(a);
   }
 }

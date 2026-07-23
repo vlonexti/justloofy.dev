@@ -91,46 +91,65 @@ The site works in **demo mode** (sample mods, no accounts) out of the box, so yo
 
 ## Part 3 — Stripe (paid mods)
 
-Free mods already work after Part 2. For paid mods:
+Free mods already work after Part 2. For paid mods you need to deploy the two
+edge functions in `supabase/functions/` and give them your Stripe keys.
 
-### 3a. Install the Supabase CLI and link your project
+> **You do NOT need to create products in Stripe's Product catalog.** The site
+> builds each checkout dynamically from the prices in your `mods` table — the
+> mods you add in the Admin panel ARE the products.
+
+### Option A — everything in the browser (recommended, no installs)
+
+1. **Deploy the functions** — Supabase Dashboard → **Edge Functions → Deploy a new
+   function → Via Editor**:
+   - Name it exactly `create-checkout`, paste the contents of
+     [`supabase/functions/create-checkout/index.ts`](supabase/functions/create-checkout/index.ts), deploy.
+   - Repeat with the name `stripe-webhook` and
+     [`supabase/functions/stripe-webhook/index.ts`](supabase/functions/stripe-webhook/index.ts).
+   - Open the **stripe-webhook** function → **Details** → turn **OFF “Enforce JWT
+     verification”** (Stripe can't send Supabase login tokens).
+2. **Add the secrets** — Dashboard → **Edge Functions → Secrets** (or Project
+   Settings → Edge Functions). Add:
+   | Name | Value |
+   |---|---|
+   | `STRIPE_SECRET_KEY` | from Stripe → Developers → API keys (`sk_test_...` first) |
+   | `SITE_URL` | `https://justloofy.dev` |
+3. **Connect the webhook** — Stripe Dashboard → **Developers → Webhooks → Add
+   endpoint**:
+   - URL: `https://YOUR-PROJECT.supabase.co/functions/v1/stripe-webhook`
+   - Events: just **`checkout.session.completed`**
+   - Copy the endpoint's **Signing secret** (`whsec_...`) and add it as a third
+     Supabase secret named `STRIPE_WEBHOOK_SECRET`.
+4. **Test** — with `sk_test_` keys, buy one of your own mods with card
+   `4242 4242 4242 4242` (any future date/CVC). It should land in your library
+   within seconds. Then swap the secrets to your `sk_live_` key and a live-mode
+   webhook endpoint, and you're selling for real.
+
+### Option B — via the Supabase CLI
 
 ```bash
 npm install -g supabase
 supabase login
 supabase link --project-ref YOUR-PROJECT-REF
-```
-(`YOUR-PROJECT-REF` is the random string in your Supabase URL, e.g. `abcdefgh` from `https://abcdefgh.supabase.co`. Run these commands from this folder.)
-
-### 3b. Set the secrets
-
-Get your **Secret key** from Stripe: **Dashboard → Developers → API keys** (starts with `sk_live_` — use `sk_test_` first to test).
-
-```bash
 supabase secrets set STRIPE_SECRET_KEY=sk_test_...
 supabase secrets set SITE_URL=https://justloofy.dev
-```
-
-### 3c. Deploy the two edge functions
-
-```bash
 supabase functions deploy create-checkout
 supabase functions deploy stripe-webhook --no-verify-jwt
 ```
+Then do steps 3–4 from Option A.
 
-### 3d. Point Stripe's webhook at your function
+## Live updates (realtime)
 
-1. Stripe Dashboard → **Developers → Webhooks → Add endpoint**.
-2. Endpoint URL: `https://YOUR-PROJECT.supabase.co/functions/v1/stripe-webhook`
-3. Events: select just **`checkout.session.completed`**.
-4. After creating it, copy the **Signing secret** (`whsec_...`) and set it:
-   ```bash
-   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
-   ```
+The site subscribes to database changes, so new mods, edits, and fresh purchases
+appear on screen **without anyone refreshing**. If you ran `schema.sql` before
+this feature existed, enable it with one query in the SQL Editor:
 
-### 3e. Test it
+```sql
+alter publication supabase_realtime add table public.mods;
+alter publication supabase_realtime add table public.purchases;
+```
 
-With `sk_test_` keys, buy one of your own mods using Stripe's test card `4242 4242 4242 4242` (any future date, any CVC). It should appear in your library within seconds. When it works, swap in your `sk_live_` key, re-run the two `secrets set` commands, and create a new webhook endpoint in **live mode**.
+(If it says the table is already in the publication, you're done.)
 
 ---
 
