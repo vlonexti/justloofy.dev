@@ -115,15 +115,18 @@ alter table public.purchases enable row level security;
 create policy "Users can view their own purchases"
   on public.purchases for select using (auth.uid() = user_id or public.is_admin());
 
--- Users may add FREE mods to their library themselves.
+-- Users may add FREE mods to their library themselves; admins may claim ANY mod free.
 -- Paid purchases are inserted only by the Stripe webhook (service role bypasses RLS).
 create policy "Users can claim free mods"
   on public.purchases for insert with check (
     auth.uid() = user_id
     and amount_cents = 0
-    and exists (
-      select 1 from public.mods
-      where id = mod_id and price_cents = 0 and published = true
+    and (
+      public.is_admin()
+      or exists (
+        select 1 from public.mods
+        where id = mod_id and price_cents = 0 and published = true
+      )
     )
   );
 

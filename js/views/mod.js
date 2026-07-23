@@ -1,5 +1,5 @@
 import {
-  isLive, getMod, getSession, ownsMod, claimFreeMod, createCheckout, getDownloadUrl,
+  isLive, getMod, getSession, getMyProfile, ownsMod, claimFreeMod, createCheckout, getDownloadUrl,
 } from "../db.js";
 import { mediaHtml, money, esc, toast } from "../ui.js";
 
@@ -70,11 +70,12 @@ function wireGallery(app, mod) {
   window.addEventListener("hashchange", () => document.removeEventListener("keydown", onKey), { once: true });
 }
 
-function buyButtonHtml(mod, owned, signedIn) {
-  if (owned) {
+function buyButtonHtml(mod, owned, signedIn, isAdmin) {
+  if (owned || isAdmin) {
     return `
-      <p class="owned-note">✓ In your library</p>
-      <button class="btn btn-primary btn-block" id="download-btn">⬇ Download latest version</button>`;
+      <p class="owned-note">${owned ? "✓ In your library" : "👑 Admin — every mod is free for you"}</p>
+      <button class="btn btn-primary btn-block" id="download-btn">⬇ Download latest version</button>
+      ${!owned && isAdmin ? `<button class="btn btn-ghost btn-sm btn-block" id="claim-btn" style="margin-top:10px">＋ Add to my library</button>` : ""}`;
   }
   if (mod.price_cents === 0) {
     return `<button class="btn btn-primary btn-block" id="claim-btn">${signedIn ? "Add to library — Free" : "Sign in to get it free"}</button>`;
@@ -104,6 +105,10 @@ export async function modView(app, { id }) {
 
   const session = isLive ? await getSession() : null;
   const owned = session ? await ownsMod(mod.id).catch(() => false) : false;
+  let isAdmin = false;
+  if (session) {
+    try { isAdmin = Boolean((await getMyProfile())?.is_admin); } catch { /* not fatal */ }
+  }
   const released = new Date(mod.created_at).toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "numeric",
   });
@@ -127,7 +132,7 @@ export async function modView(app, { id }) {
           <p class="tagline">${esc(mod.tagline ?? "")}</p>
           <div class="buy-box">
             <span class="price ${mod.price_cents === 0 ? "free" : ""}">${money(mod.price_cents)}</span>
-            <div id="buy-area">${buyButtonHtml(mod, owned, Boolean(session))}</div>
+            <div id="buy-area">${buyButtonHtml(mod, owned, Boolean(session), isAdmin)}</div>
           </div>
           <ul class="meta-list">
             <li><span>Version</span><span>${esc(mod.version ?? "1.0.0")}</span></li>
