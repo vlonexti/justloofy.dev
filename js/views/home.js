@@ -1,4 +1,4 @@
-import { getMods, getRatings } from "../db.js";
+import { isLive, getSession, getMods, getRatings } from "../db.js";
 import { modCardHtml, toast } from "../ui.js";
 import { animateCount } from "../effects.js";
 
@@ -7,6 +7,8 @@ const fmt = (n) =>
 
 export async function homeView(app) {
   document.title = "JustLoofy Mods — Premium Game Mods";
+
+  const signedIn = Boolean(isLive ? await getSession() : null);
 
   app.innerHTML = `
     <section class="hero">
@@ -21,7 +23,9 @@ export async function homeView(app) {
         <p class="sub">Handcrafted mods by Steven. Buy once, keep forever — every mod lives in your library with instant downloads and free updates.</p>
         <div class="hero-cta">
           <a class="btn btn-primary btn-lg" href="#/mods">Browse mods</a>
-          <a class="btn btn-ghost btn-lg" href="#/auth?tab=signup">Create free account</a>
+          ${signedIn
+            ? `<a class="btn btn-ghost btn-lg" href="#/account">My library</a>`
+            : `<a class="btn btn-ghost btn-lg" href="#/auth?tab=signup">Create free account</a>`}
         </div>
         <div class="hero-stats" id="hero-stats">
           <div class="stat"><b id="stat-mods">—</b><span>Mods released</span></div>
@@ -121,9 +125,13 @@ export async function homeView(app) {
     <section class="section">
       <div class="container">
         <div class="cta-band reveal">
-          <h2>Ready to mod like you mean it?</h2>
-          <p>Create a free account and start building your library today. Buy once, keep forever.</p>
-          <a class="btn btn-primary btn-lg" href="#/auth?tab=signup">Get started — it's free</a>
+          ${signedIn
+            ? `<h2>Your library is waiting.</h2>
+               <p>Downloads never expire and every update is free — grab something new for the collection.</p>
+               <a class="btn btn-primary btn-lg" href="#/account">Open my library</a>`
+            : `<h2>Ready to mod like you mean it?</h2>
+               <p>Create a free account and start building your library today. Buy once, keep forever.</p>
+               <a class="btn btn-primary btn-lg" href="#/auth?tab=signup">Get started — it's free</a>`}
         </div>
       </div>
     </section>`;
