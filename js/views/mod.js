@@ -16,7 +16,7 @@ function buyButtonHtml(mod, owned, signedIn) {
   if (owned) {
     return `
       <p class="owned-note">✓ In your library</p>
-      <button class="btn btn-primary btn-block" id="download-btn">Download latest version</button>`;
+      <button class="btn btn-primary btn-block" id="download-btn">⬇ Download latest version</button>`;
   }
   if (mod.price_cents === 0) {
     return `<button class="btn btn-primary btn-block" id="claim-btn">${signedIn ? "Add to library — Free" : "Sign in to get it free"}</button>`;
@@ -124,7 +124,7 @@ export async function modView(app, { id }) {
       toast(err.message, "error");
     } finally {
       btn.disabled = false;
-      btn.textContent = "Download latest version";
+      btn.textContent = "⬇ Download latest version";
     }
   });
 }

@@ -62,23 +62,33 @@ export async function adminView(app) {
           </div>
           <div class="field-row">
             <div class="field">
-              <label for="f-image">Cover image ${mod.image_url ? "(uploaded ✓ — choose a file to replace)" : ""}</label>
-              <input id="f-image" type="file" accept="image/*">
+              <label>Cover image</label>
+              <div class="file-input">
+                <label class="btn btn-ghost btn-sm" for="f-image">🖼️ Choose image</label>
+                <span class="file-name ${mod.image_url ? "chosen" : ""}" id="f-image-name">${mod.image_url ? "✓ Uploaded — pick a file to replace it" : "No file selected"}</span>
+                <input id="f-image" type="file" accept="image/*">
+              </div>
             </div>
             <div class="field">
-              <label for="f-file">Mod file (.zip) ${mod.file_path ? "(uploaded ✓ — choose a file to replace)" : ""}</label>
-              <input id="f-file" type="file">
+              <label>Mod file (.zip)</label>
+              <div class="file-input">
+                <label class="btn btn-ghost btn-sm" for="f-file">📦 Choose .zip</label>
+                <span class="file-name ${mod.file_path ? "chosen" : ""}" id="f-file-name">${mod.file_path ? "✓ Uploaded — pick a file to replace it" : "No file selected"}</span>
+                <input id="f-file" type="file">
+              </div>
             </div>
           </div>
-          <div class="field-row" style="align-items:center">
-            <div class="checkbox-row">
+          <div class="field-row" style="align-items:center;margin-bottom:18px">
+            <label class="switch">
               <input type="checkbox" id="f-featured" ${mod.featured ? "checked" : ""}>
-              <label for="f-featured">Featured on home page</label>
-            </div>
-            <div class="checkbox-row">
+              <span class="track"></span>
+              <span>Featured on home page</span>
+            </label>
+            <label class="switch">
               <input type="checkbox" id="f-published" ${mod.published !== false ? "checked" : ""}>
-              <label for="f-published">Published (visible in store)</label>
-            </div>
+              <span class="track"></span>
+              <span>Published (visible in store)</span>
+            </label>
           </div>
           <div style="display:flex;gap:12px;margin-top:10px">
             <button class="btn btn-primary" type="submit">${mod.id ? "Save changes" : "Create mod"}</button>
@@ -123,6 +133,20 @@ export async function adminView(app) {
     </div>`;
 
     app.querySelector("#mod-form").addEventListener("submit", onSave);
+
+    // Show the picked filename (with a ✓) inside the custom file inputs
+    const wireFile = (inputId, nameId) => {
+      const input = app.querySelector(inputId);
+      const nameEl = app.querySelector(nameId);
+      input?.addEventListener("change", () => {
+        if (!input.files[0]) return;
+        nameEl.textContent = `✓ ${input.files[0].name}`;
+        nameEl.classList.add("chosen");
+      });
+    };
+    wireFile("#f-image", "#f-image-name");
+    wireFile("#f-file", "#f-file-name");
+
     app.querySelector("#cancel-edit")?.addEventListener("click", () => {
       editing = null;
       render();

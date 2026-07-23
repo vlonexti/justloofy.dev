@@ -47,7 +47,7 @@ export async function accountView(app) {
               <b>${esc(mod.title)}</b>
               <span>${esc(mod.game)} · v${esc(mod.version ?? "1.0.0")} · ${p.amount_cents === 0 ? "Free" : money(p.amount_cents)}</span>
             </div>
-            <button class="btn btn-primary btn-sm dl-btn" data-id="${esc(mod.id)}">Download</button>
+            <button class="btn btn-primary btn-sm dl-btn" data-id="${esc(mod.id)}">⬇ Download</button>
           </div>`;
       }).join("")
     : `<div class="empty" style="padding:40px 20px">
@@ -121,7 +121,7 @@ export async function accountView(app) {
         toast(err.message, "error");
       } finally {
         btn.disabled = false;
-        btn.textContent = "Download";
+        btn.textContent = "⬇ Download";
       }
     })
   );

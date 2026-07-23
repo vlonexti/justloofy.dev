@@ -771,6 +771,77 @@ label {
   font-size: 0.83rem;
 }
 
+/* ---------- Custom form controls ---------- */
+
+/* File picker: hidden native input, themed button + filename readout */
+.file-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px dashed var(--border-hover);
+  border-radius: 10px;
+  padding: 9px 12px;
+  transition: border-color 0.15s;
+}
+.file-input:hover { border-color: var(--accent); }
+.file-input input[type="file"] { display: none; }
+.file-input > label { margin: 0; flex-shrink: 0; }
+.file-name {
+  color: var(--muted);
+  font-size: 0.86rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-name.chosen { color: var(--success); font-weight: 500; }
+
+/* Toggle switch (replaces checkboxes) */
+label.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.switch input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.switch .track {
+  position: relative;
+  width: 44px; height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hover);
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.switch .track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 3px;
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: left 0.2s, background 0.2s;
+}
+.switch input:checked + .track {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.switch input:checked + .track::after {
+  left: 22px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(255, 59, 78, 0.6);
+}
+.switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(255, 59, 78, 0.25); }
+
 /* ---------- Shop trust elements ---------- */
 
 .trust-bar {
