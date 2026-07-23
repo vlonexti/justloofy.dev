@@ -1,4 +1,4 @@
-import { getMods } from "../db.js";
+import { getMods, getRatings } from "../db.js";
 import { modCardHtml, esc, toast } from "../ui.js";
 
 export async function modsView(app) {
@@ -78,7 +78,9 @@ export async function modsView(app) {
   sortSelect.addEventListener("change", render);
 
   try {
-    allMods = await getMods();
+    const [all, ratings] = await Promise.all([getMods(), getRatings().catch(() => ({}))]);
+    all.forEach((m) => (m._rating = ratings[m.id]));
+    allMods = all;
     renderChips();
     render();
   } catch (err) {

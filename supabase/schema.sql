@@ -130,6 +130,50 @@ create policy "Users can claim free mods"
     )
   );
 
+-- ---------- Ratings (1–5 stars, owners only, one per user per mod) ----------
+
+create table public.ratings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  mod_id uuid not null references public.mods (id) on delete cascade,
+  stars integer not null check (stars between 1 and 5),
+  created_at timestamptz not null default now(),
+  unique (user_id, mod_id)
+);
+
+alter table public.ratings enable row level security;
+
+create policy "Ratings are viewable by everyone"
+  on public.ratings for select using (true);
+
+-- Only people who own the mod (or admins) can rate it
+create policy "Owners can rate"
+  on public.ratings for insert with check (
+    auth.uid() = user_id
+    and (
+      public.is_admin()
+      or exists (
+        select 1 from public.purchases p
+        where p.user_id = auth.uid() and p.mod_id = ratings.mod_id
+      )
+    )
+  );
+
+create policy "Users can update their rating"
+  on public.ratings for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users can delete their rating"
+  on public.ratings for delete using (auth.uid() = user_id);
+
+-- Average + count per mod, used by the site
+create view public.mod_ratings with (security_invoker = true) as
+  select mod_id,
+         count(*)::int as rating_count,
+         round(avg(stars)::numeric, 1) as avg_rating
+  from public.ratings
+  group by mod_id;
+
 -- ---------- Storage buckets ----------
 
 insert into storage.buckets (id, name, public)
@@ -176,6 +220,7 @@ create policy "Buyers can read mod files"
 
 alter publication supabase_realtime add table public.mods;
 alter publication supabase_realtime add table public.purchases;
+alter publication supabase_realtime add table public.ratings;
 
 -- ============================================================
 -- AFTER RUNNING THIS: make yourself the admin.

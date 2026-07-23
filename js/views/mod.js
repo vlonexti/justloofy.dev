@@ -1,5 +1,6 @@
 import {
   isLive, getMod, getSession, getMyProfile, ownsMod, claimFreeMod, createCheckout, getDownloadUrl,
+  getRatings, getMyRating, rateMod,
 } from "../db.js";
 import { mediaHtml, money, esc, toast } from "../ui.js";
 
@@ -109,6 +110,13 @@ export async function modView(app, { id }) {
   if (session) {
     try { isAdmin = Boolean((await getMyProfile())?.is_admin); } catch { /* not fatal */ }
   }
+
+  const [ratingsMap, myRating] = await Promise.all([
+    getRatings().catch(() => ({})),
+    getMyRating(mod.id).catch(() => null),
+  ]);
+  const rating = ratingsMap[mod.id];
+  const canRate = Boolean(session) && (owned || isAdmin);
   const released = new Date(mod.created_at).toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "numeric",
   });
@@ -140,11 +148,49 @@ export async function modView(app, { id }) {
             <li><span>Downloads</span><span>${(mod.downloads ?? 0).toLocaleString()}</span></li>
             <li><span>Released</span><span>${released}</span></li>
           </ul>
+          <div class="rating-box">
+            <div class="rating-summary">
+              <span class="stars-avg">${[1, 2, 3, 4, 5]
+                .map((i) => `<span class="star ${rating && i <= Math.round(rating.avg) ? "on" : ""}">★</span>`)
+                .join("")}</span>
+              <span>${rating ? `${rating.avg.toFixed(1)} · ${rating.count} rating${rating.count === 1 ? "" : "s"}` : "No ratings yet"}</span>
+            </div>
+            ${canRate
+              ? `<div class="rate-row" id="rate-row">
+                   ${[1, 2, 3, 4, 5]
+                     .map((i) => `<button class="star-btn ${myRating && i <= myRating ? "on" : ""}" data-stars="${i}" aria-label="Rate ${i} star${i === 1 ? "" : "s"}">★</button>`)
+                     .join("")}
+                 </div>
+                 <p class="rate-hint">${myRating ? `Your rating: ${myRating}/5 — click a star to change it` : "Click a star to rate this mod"}</p>`
+              : `<p class="rate-hint">${session ? "Get this mod to rate it" : "Sign in and get this mod to rate it"}</p>`}
+          </div>
         </div>
       </div>
     </div>`;
 
   wireGallery(app, mod);
+
+  const rateRow = app.querySelector("#rate-row");
+  if (rateRow) {
+    const btns = [...rateRow.querySelectorAll(".star-btn")];
+    const paint = (n) => btns.forEach((b, i) => b.classList.toggle("on", i < n));
+    btns.forEach((b, i) =>
+      b.addEventListener("click", async () => {
+        try {
+          await rateMod(mod.id, i + 1);
+          toast(`Rated ${i + 1}/5 — thanks!`, "success");
+          modView(app, { id });
+        } catch (err) {
+          toast(
+            /row-level security/i.test(err.message) ? "You need to own this mod to rate it." : err.message,
+            "error"
+          );
+        }
+      })
+    );
+    btns.forEach((b, i) => b.addEventListener("mouseenter", () => paint(i + 1)));
+    rateRow.addEventListener("mouseleave", () => paint(myRating ?? 0));
+  }
 
   const goSignIn = () =>
     (location.hash = `#/auth?next=${encodeURIComponent(`#/mod/${mod.id}`)}`);

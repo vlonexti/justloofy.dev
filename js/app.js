@@ -78,6 +78,7 @@ if (isLive && supabase) {
   supabase
     .channel("live-updates")
     .on("postgres_changes", { event: "*", schema: "public", table: "mods" }, quietRefresh)
+    .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, quietRefresh)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "purchases" }, () => {
       toast("Your library just updated!", "success");
       quietRefresh();

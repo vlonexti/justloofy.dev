@@ -60,6 +60,7 @@ export function modCardHtml(mod) {
         <h3>${esc(mod.title)}</h3>
         <p class="tagline">${esc(mod.tagline ?? "")}</p>
         <div class="card-meta">
+          ${mod._rating?.count ? `<span class="star-gold">★ ${mod._rating.avg.toFixed(1)}</span>` : ""}
           <span>⬇ ${(mod.downloads ?? 0).toLocaleString()} downloads</span>
           <span>v${esc(mod.version ?? "1.0.0")}</span>
         </div>

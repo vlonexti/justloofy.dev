@@ -888,6 +888,43 @@ label.switch {
   .detail-info { position: sticky; top: 96px; }
 }
 
+/* ---------- Star ratings ---------- */
+
+.card-meta .star-gold { color: #ffb347; font-weight: 600; }
+
+.rating-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-top: 24px;
+}
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.stars-avg { letter-spacing: 2px; }
+.stars-avg .star { color: var(--faint); font-size: 1.1rem; }
+.stars-avg .star.on { color: #ffb347; }
+
+.rate-row { display: flex; gap: 2px; margin-top: 12px; }
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--faint);
+  padding: 2px 4px;
+  transition: color 0.12s, transform 0.12s;
+}
+.star-btn.on { color: #ffb347; }
+.star-btn:hover { transform: scale(1.2); }
+.rate-hint { color: var(--faint); font-size: 0.84rem; margin-top: 10px; }
+
 /* ---------- Image gallery (mod detail) ---------- */
 
 .gallery { position: relative; }

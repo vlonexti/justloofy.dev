@@ -1,4 +1,4 @@
-import { getMods } from "../db.js";
+import { getMods, getRatings } from "../db.js";
 import { modCardHtml, toast } from "../ui.js";
 import { animateCount } from "../effects.js";
 
@@ -130,7 +130,8 @@ export async function homeView(app) {
 
   const grid = app.querySelector("#featured-grid");
   try {
-    const all = await getMods();
+    const [all, ratings] = await Promise.all([getMods(), getRatings().catch(() => ({}))]);
+    all.forEach((m) => (m._rating = ratings[m.id]));
     const featured = all.filter((m) => m.featured);
     const toShow = (featured.length ? featured : all).slice(0, 3);
 

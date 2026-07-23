@@ -275,6 +275,45 @@ export async function getDownloadUrl(mod) {
   return data.signedUrl;
 }
 
+// ---------- Ratings ----------
+
+/** Map of mod_id -> { avg, count } for every rated mod. */
+export async function getRatings() {
+  if (!isLive) return {};
+  const { data, error } = await supabase.from("mod_ratings").select("*");
+  if (error) throw error;
+  const map = {};
+  for (const r of data) map[r.mod_id] = { avg: Number(r.avg_rating), count: r.rating_count };
+  return map;
+}
+
+/** The signed-in user's own rating for a mod (1–5), or null. */
+export async function getMyRating(modId) {
+  if (!isLive) return null;
+  const session = await getSession();
+  if (!session) return null;
+  const { data, error } = await supabase
+    .from("ratings")
+    .select("stars")
+    .eq("user_id", session.user.id)
+    .eq("mod_id", modId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.stars ?? null;
+}
+
+/** Rate a mod 1–5 stars (owners only; re-rating overwrites). */
+export async function rateMod(modId, stars) {
+  if (!isLive) throw demoError();
+  const session = await getSession();
+  if (!session) throw new Error("Sign in to rate mods.");
+  const { error } = await supabase.from("ratings").upsert(
+    { user_id: session.user.id, mod_id: modId, stars },
+    { onConflict: "user_id,mod_id" }
+  );
+  if (error) throw error;
+}
+
 // ---------- Admin ----------
 
 export async function saveMod(mod) {
