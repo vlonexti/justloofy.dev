@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — JustLoofy Mods</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="site-header"></div>
+
+  <main>
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <h1 id="auth-title">Welcome back</h1>
+        <p class="sub" id="auth-sub">Sign in to access your mod library.</p>
+
+        <div class="tabs">
+          <button id="tab-login" class="active" type="button">Sign in</button>
+          <button id="tab-signup" type="button">Create account</button>
+        </div>
+
+        <form id="login-form">
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+          <p class="auth-alt"><a href="#" id="forgot-link">Forgot your password?</a></p>
+        </form>
+
+        <form id="signup-form" hidden>
+          <div class="field">
+            <label for="signup-username">Username</label>
+            <input type="text" id="signup-username" required minlength="3" maxlength="24" autocomplete="username" placeholder="LoofyFan99">
+          </div>
+          <div class="field">
+            <label for="signup-email">Email</label>
+            <input type="email" id="signup-email" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="field">
+            <label for="signup-password">Password</label>
+            <input type="password" id="signup-password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Create account</button>
+          <p class="auth-alt">Free forever. No spam — ever.</p>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+  <script type="module" src="js/pages/auth.js"></script>
+</body>
+</html>
