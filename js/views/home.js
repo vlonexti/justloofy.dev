@@ -1,56 +1,45 @@
-import { isLive, getSession, getMods, getRatings } from "../db.js";
-import { modCardHtml, toast } from "../ui.js";
+import { isLive, getSession, getProducts, getStoreStats, decorate } from "../db.js";
+import { productCardHtml, toast, pageTitle } from "../ui.js";
+import { CONFIG } from "../config.js";
 import { animateCount } from "../effects.js";
 
-const fmt = (n) =>
-  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k+` : String(n);
-
 export async function homeView(app) {
-  document.title = "JustLoofy Mods — Premium Game Mods";
+  document.title = pageTitle();
 
   const signedIn = Boolean(isLive ? await getSession() : null);
 
   app.innerHTML = `
     <section class="hero">
-      <div class="embers" aria-hidden="true">
-        <span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span>
-      </div>
-      <img class="hero-moon" src="assets/favicon.svg" alt="" aria-hidden="true">
+      <div class="hero-orb" aria-hidden="true"></div>
+      <div class="stars" aria-hidden="true"></div>
       <div class="container">
-        <div class="hero-badge">🌒 New drops every month</div>
-        <h1>Game mods,<br>done <span class="grad">properly</span>.</h1>
-        <p class="sub">Handcrafted mods by Steven. Buy once, keep forever — every mod lives in your library with instant downloads and free updates.</p>
-        <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="#/mods">Browse mods</a>
-          ${signedIn
-            ? `<a class="btn btn-ghost btn-lg" href="#/account">My library</a>`
-            : `<a class="btn btn-ghost btn-lg" href="#/auth?tab=signup">Create free account</a>`}
+        <div class="pill-badge reveal" id="trust-badge">
+          <span class="dot-live"></span> Trusted by <b id="trust-count">—</b> customers
         </div>
-        <div class="hero-stats" id="hero-stats">
-          <div class="stat"><b id="stat-mods">—</b><span>Mods released</span></div>
-          <div class="stat"><b id="stat-downloads">—</b><span>Total downloads</span></div>
-          <div class="stat"><b id="stat-games">—</b><span>Games supported</span></div>
+        <h1 class="reveal">Everything you play,<br>delivered instantly.</h1>
+        <p class="sub reveal">
+          Handcrafted game mods, ready-to-use accounts, and all-access memberships.
+          Pay once, it lands in your library seconds later — no lockers, no ads, no waiting.
+        </p>
+        <div class="hero-cta reveal">
+          <a class="btn btn-primary btn-lg" href="#/products">Browse the store</a>
+          <a class="btn btn-ghost btn-lg" href="${CONFIG.DISCORD_URL}" target="_blank" rel="noopener">Join the Discord</a>
         </div>
-        <div class="trust-bar">
-          <div><span>🔒</span> Secure Stripe checkout</div>
-          <div><span>⚡</span> Instant downloads</div>
-          <div><span>🔄</span> Free updates forever</div>
-          <div><span>🛡️</span> Every file built &amp; tested by me</div>
-        </div>
+        ${signedIn ? "" : `<p class="hero-note reveal"><a href="#/auth?tab=signup">Create a free account</a> — it takes ten seconds and keeps everything you buy.</p>`}
       </div>
+      <div class="hero-fade" aria-hidden="true"></div>
     </section>
 
     <section class="section">
       <div class="container">
         <div class="section-head">
           <div>
-            <h2>Featured mods</h2>
-            <p>The current lineup — hand-picked and battle-tested.</p>
+            <h2>Featured right now</h2>
+            <p>The current lineup — hand-picked and in stock.</p>
           </div>
-          <a class="btn btn-outline btn-sm" href="#/mods">View all →</a>
+          <a class="btn btn-outline btn-sm" href="#/products">View all →</a>
         </div>
-        <div class="mod-grid" id="featured-grid">
+        <div class="product-grid" id="featured-grid">
           <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
         </div>
       </div>
@@ -58,7 +47,7 @@ export async function homeView(app) {
 
     <section class="section">
       <div class="container">
-        <div class="section-head">
+        <div class="section-head center">
           <div>
             <h2>Why buy here?</h2>
             <p>Direct from the creator — no middlemen, no lockers, no ads.</p>
@@ -68,22 +57,22 @@ export async function homeView(app) {
           <div class="feature reveal">
             <div class="icon">⚡</div>
             <h3>Instant delivery</h3>
-            <p>Pay with card via Stripe and the mod lands in your library immediately. Download it as many times as you want.</p>
+            <p>Pay by card through Stripe and it is in your library immediately — the file, the account credentials, or the membership unlock.</p>
           </div>
           <div class="feature reveal">
             <div class="icon">🔄</div>
             <h3>Free updates forever</h3>
-            <p>Buy once and every future version of that mod is yours. Updates appear right in your library.</p>
+            <p>Buy a mod once and every future version is yours. Updated releases are stamped with the date so you always know what's new.</p>
           </div>
           <div class="feature reveal">
-            <div class="icon">🛡️</div>
-            <h3>Clean &amp; safe files</h3>
-            <p>Every release is built and tested by me personally. No repacks, no bundled junk, no sketchy installers.</p>
+            <div class="icon">📊</div>
+            <h3>Real stock counts</h3>
+            <p>Account listings show exactly how many are left, live. When it says 12 left, there are 12 — and yours is reserved the moment you pay.</p>
           </div>
           <div class="feature reveal">
             <div class="icon">💬</div>
             <h3>Direct support</h3>
-            <p>Something broken? Reach me on the channel or GitHub and I'll get you sorted — I actually answer.</p>
+            <p>Something broken? Reach me on the channel or GitHub and I'll sort it — I actually answer.</p>
           </div>
         </div>
       </div>
@@ -91,7 +80,7 @@ export async function homeView(app) {
 
     <section class="section">
       <div class="container">
-        <div class="section-head">
+        <div class="section-head center">
           <div>
             <h2>Questions, answered</h2>
             <p>Everything buyers usually ask before hitting the button.</p>
@@ -99,24 +88,24 @@ export async function homeView(app) {
         </div>
         <div class="faq">
           <details class="reveal">
-            <summary>How do I get my mod after buying?<span class="faq-icon">+</span></summary>
-            <p>Instantly. The moment your payment goes through, the mod appears in your library on your account page. Download it as many times as you want, on any device — your purchases never expire.</p>
+            <summary>How fast do I get my order?<span class="faq-icon">+</span></summary>
+            <p>Instantly. The moment your payment goes through it appears on your account page — mods as a download, accounts as credentials you can copy, memberships as an unlock. Nothing is sent by hand.</p>
           </details>
           <details class="reveal">
-            <summary>Do I have to pay again for updates?<span class="faq-icon">+</span></summary>
-            <p>Never. Buy a mod once and every future version is yours free. When an update drops, just re-download from your library and you'll get the latest version.</p>
+            <summary>What does "45 left" mean on an account listing?<span class="faq-icon">+</span></summary>
+            <p>Exactly what it says. Every account is a separate item in stock, and one is reserved for you the second you pay. When the counter hits zero the listing shows Sold out until it is restocked.</p>
+          </details>
+          <details class="reveal">
+            <summary>Do I have to pay again for mod updates?<span class="faq-icon">+</span></summary>
+            <p>Never. Buy a mod once and every future version is yours free. Re-download from your library any time — the product page shows both the original release date and the date of the latest update.</p>
+          </details>
+          <details class="reveal">
+            <summary>How do I cancel a subscription?<span class="faq-icon">+</span></summary>
+            <p>From your account page — there's a Manage subscription button that opens Stripe's own billing portal. Cancel there and you keep access until the period you already paid for runs out.</p>
           </details>
           <details class="reveal">
             <summary>What payment methods do you accept?<span class="faq-icon">+</span></summary>
-            <p>Checkout is handled by Stripe, so all major credit and debit cards work (plus Apple Pay and Google Pay where available). Your card details go straight to Stripe — this site never sees or stores them.</p>
-          </details>
-          <details class="reveal">
-            <summary>Can I use a mod on more than one PC?<span class="faq-icon">+</span></summary>
-            <p>Yes — a purchase is for you, not for one machine. Install it on every PC you play on. Just don't share the files around; every sale keeps new mods coming.</p>
-          </details>
-          <details class="reveal">
-            <summary>Something's broken — what do I do?<span class="faq-icon">+</span></summary>
-            <p>Reach out on the YouTube channel or GitHub (links in the footer) and I'll get you sorted. If a mod genuinely doesn't work as described, I'll make it right.</p>
+            <p>Checkout is handled by Stripe, so all major credit and debit cards work, plus Apple Pay and Google Pay where available. Your card details go straight to Stripe — this site never sees or stores them.</p>
           </details>
         </div>
       </div>
@@ -127,42 +116,43 @@ export async function homeView(app) {
         <div class="cta-band reveal">
           ${signedIn
             ? `<h2>Your library is waiting.</h2>
-               <p>Downloads never expire and every update is free — grab something new for the collection.</p>
+               <p>Downloads never expire and every mod update is free — grab something new for the collection.</p>
                <a class="btn btn-primary btn-lg" href="#/account">Open my library</a>`
-            : `<h2>Ready to mod like you mean it?</h2>
+            : `<h2>Ready when you are.</h2>
                <p>Create a free account and start building your library today. Buy once, keep forever.</p>
                <a class="btn btn-primary btn-lg" href="#/auth?tab=signup">Get started — it's free</a>`}
         </div>
       </div>
     </section>`;
 
+  // ---- trust badge (real customer count, quietly hidden if unavailable) ----
+  const fallbackBadge = () => {
+    const badge = app.querySelector("#trust-badge");
+    if (badge) badge.innerHTML = `<span class="dot-live"></span> New drops every month`;
+  };
+
+  getStoreStats()
+    .then((s) => {
+      if (s.customers > 0) {
+        animateCount(app.querySelector("#trust-count"), s.customers, { format: String });
+      } else {
+        fallbackBadge();
+      }
+    })
+    .catch(fallbackBadge);
+
+  // ---- featured products ----
   const grid = app.querySelector("#featured-grid");
   try {
-    const [all, ratings] = await Promise.all([getMods(), getRatings().catch(() => ({}))]);
-    all.forEach((m) => (m._rating = ratings[m.id]));
-    const featured = all.filter((m) => m.featured);
+    const all = await decorate(await getProducts());
+    const featured = all.filter((p) => p.featured);
     const toShow = (featured.length ? featured : all).slice(0, 3);
 
     grid.innerHTML = toShow.length
-      ? toShow.map(modCardHtml).join("")
+      ? toShow.map(productCardHtml).join("")
       : `<div class="empty" style="grid-column:1/-1"><div class="big">🌒</div>First drops are in the works — check back soon!</div>`;
-
-    if (!all.length) {
-      app.querySelector("#hero-stats").style.display = "none";
-      return;
-    }
-
-    animateCount(app.querySelector("#stat-mods"), all.length, { format: String });
-    animateCount(
-      app.querySelector("#stat-downloads"),
-      all.reduce((sum, m) => sum + (m.downloads ?? 0), 0),
-      { format: fmt, duration: 1800 }
-    );
-    animateCount(app.querySelector("#stat-games"), new Set(all.map((m) => m.game)).size, {
-      format: String,
-    });
   } catch (err) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">⚠️</div>Couldn't load mods. Try refreshing.</div>`;
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">⚠️</div>Couldn't load the store. Try refreshing.</div>`;
     toast(err.message, "error");
   }
 }

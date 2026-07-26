@@ -1,8 +1,9 @@
 import { isLive, getSession, signIn, signUp, sendPasswordReset } from "../db.js";
-import { toast } from "../ui.js";
+import { toast, pageTitle } from "../ui.js";
+import { CONFIG } from "../config.js";
 
 export async function authView(app, { params }) {
-  document.title = "Sign in — JustLoofy Mods";
+  document.title = pageTitle("Sign in");
 
   const nextUrl = params.get("next") || "#/account";
 
@@ -19,7 +20,7 @@ export async function authView(app, { params }) {
     <div class="auth-wrap">
       <div class="auth-card">
         <h1 id="auth-title">Welcome back</h1>
-        <p class="sub" id="auth-sub">Sign in to access your mod library.</p>
+        <p class="sub" id="auth-sub">Sign in to reach your library.</p>
 
         <div class="tabs">
           <button id="tab-login" class="active" type="button">Sign in</button>
@@ -71,10 +72,10 @@ export async function authView(app, { params }) {
     tabSignup.classList.toggle("active", !login);
     loginForm.hidden = !login;
     signupForm.hidden = login;
-    title.textContent = login ? "Welcome back" : "Join JustLoofy";
+    title.textContent = login ? "Welcome back" : `Join ${CONFIG.SITE_NAME}`;
     sub.textContent = login
-      ? "Sign in to access your mod library."
-      : "Free account — buy mods, keep them forever.";
+      ? "Sign in to reach your library."
+      : "Free account — buy once, keep it forever.";
   }
 
   tabLogin.addEventListener("click", () => showTab("login"));

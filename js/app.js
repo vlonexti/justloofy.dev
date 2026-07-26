@@ -1,17 +1,21 @@
 // ============================================================
 // SPA router — swaps views inside #app with no page reloads,
 // and subscribes to Supabase realtime so the site live-updates.
-// Routes look like:  #/  #/mods  #/mod/<id>  #/auth  #/account
+// Routes:  #/  #/products  #/product/<id>  #/auth  #/account
+//          #/settings  #/admin  #/success
+// (#/mods and #/mod/<id> still work — old links stay valid.)
 // ============================================================
 
+import "./theme.js";
 import "./effects.js";
 import { setActiveNav, closeMobileNav, toast } from "./ui.js";
 import { isLive, supabase } from "./db.js";
 import { homeView } from "./views/home.js";
-import { modsView } from "./views/mods.js";
-import { modView } from "./views/mod.js";
+import { productsView } from "./views/products.js";
+import { productView } from "./views/product.js";
 import { authView } from "./views/auth.js";
 import { accountView } from "./views/account.js";
+import { settingsView } from "./views/settings.js";
 import { adminView } from "./views/admin.js";
 import { successView } from "./views/success.js";
 import { notFoundView } from "./views/notfound.js";
@@ -20,10 +24,11 @@ const app = document.getElementById("app");
 
 const routes = [
   { pattern: /^\/$/, view: homeView },
-  { pattern: /^\/mods$/, view: modsView },
-  { pattern: /^\/mod\/(.+)$/, view: modView },
+  { pattern: /^\/(?:products|mods)$/, view: productsView },
+  { pattern: /^\/(?:product|mod)\/(.+)$/, view: productView },
   { pattern: /^\/auth$/, view: authView },
   { pattern: /^\/account$/, view: accountView },
+  { pattern: /^\/settings$/, view: settingsView },
   { pattern: /^\/admin$/, view: adminView },
   { pattern: /^\/success$/, view: successView },
 ];
@@ -79,6 +84,7 @@ if (isLive && supabase) {
     .channel("live-updates")
     .on("postgres_changes", { event: "*", schema: "public", table: "mods" }, quietRefresh)
     .on("postgres_changes", { event: "*", schema: "public", table: "ratings" }, quietRefresh)
+    .on("postgres_changes", { event: "*", schema: "public", table: "stock_items" }, quietRefresh)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "purchases" }, () => {
       toast("Your library just updated!", "success");
       quietRefresh();
