@@ -107,6 +107,19 @@ function actionsHtml(product, ctx) {
       <p class="secure-note">🔒 One account is reserved for you the moment you pay</p>`;
   }
 
+  if (kind === "request") {
+    const ownedNote = owned
+      ? `<p class="owned-note">✓ You have ${owned} commission${owned === 1 ? "" : "s"} — write the brief on your <a href="#/account" style="text-decoration:underline">account page</a></p>`
+      : "";
+    if (free || isAdmin) {
+      return `${ownedNote}
+        <button class="btn btn-primary btn-block" id="claim-btn">${signedIn ? (isAdmin && !free ? "👑 Open one free (admin)" : "Start a request — Free") : "Sign in to request"}</button>`;
+    }
+    return `${ownedNote}
+      <button class="btn btn-primary btn-block" id="buy-btn">${signedIn ? `${owned ? "Commission another" : "Commission this"} — ${money(product.price_cents)}` : "Sign in to commission"}</button>
+      <p class="secure-note">🔒 You describe exactly what you want right after paying</p>`;
+  }
+
   if (kind === "subscription") {
     const active = purchase && isSubActive(purchase);
     if (active) {
@@ -157,6 +170,9 @@ function metaListHtml(product) {
   }
   if (kind === "subscription") {
     rows.push(["Billing", `${money(product.price_cents)} ${intervalLabel(product, true)}`]);
+  }
+  if (kind === "request") {
+    rows.push(["Delivered as", "A file in your library"]);
   }
 
   rows.push(["Category", esc(product.game)]);
@@ -308,6 +324,11 @@ export async function productView(app, { id }) {
     btn.disabled = true;
     try {
       await claimFreeProduct(product);
+      if (kind === "request") {
+        toast("Commission opened — now tell me what you want built.", "success");
+        location.hash = "#/account";
+        return;
+      }
       toast(kind === "account" ? "Account claimed — check your library!" : "Added to your library!", "success");
       productView(app, { id });
     } catch (err) {

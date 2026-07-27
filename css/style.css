@@ -1,5 +1,5 @@
 /* ============================================================
-   JustLoofy — design system
+   0o777 — design system
    Every colour comes from a theme block below, so the whole
    site re-skins from one [data-theme] attribute on <html>.
    ============================================================ */
@@ -1270,9 +1270,55 @@ select option { background: var(--surface-2); color: var(--text); }
   padding: 4px 10px;
   border-radius: var(--radius-pill);
 }
-.pill.on { background: var(--ok-soft); color: var(--ok); }
-.pill.off { background: var(--danger-soft); color: var(--danger); }
+.pill.on, .pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.off, .pill.bad { background: var(--danger-soft); color: var(--danger); }
 .pill.neutral { background: var(--surface-3); color: var(--muted); }
+.pill.warn { background: rgba(251, 191, 36, 0.14); color: var(--warn); }
+
+/* ---------- Requests (paid commissions) ---------- */
+
+.request-block {
+  flex-basis: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  padding: 16px;
+  margin-top: 2px;
+}
+.request-block .field:last-of-type { margin-bottom: 14px; }
+
+.request-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+.request-details {
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.request-note {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--accent-soft);
+  font-size: 0.86rem;
+}
+
+.request-list { display: flex; flex-direction: column; gap: 16px; }
+.request-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 20px;
+}
 
 /* ---------- Utility blocks ---------- */
 

@@ -70,7 +70,8 @@ $$;
 
 create table public.mods (
   id uuid primary key default gen_random_uuid(),
-  kind text not null default 'mod' check (kind in ('mod', 'account', 'subscription')),
+  kind text not null default 'mod'
+    check (kind in ('mod', 'account', 'subscription', 'request')),
   title text not null,
   game text not null,               -- category label (game, platform, service…)
   tagline text,
@@ -159,10 +160,12 @@ alter table public.purchases enable row level security;
 create policy "Users can view their own purchases"
   on public.purchases for select using (auth.uid() = user_id or public.is_admin());
 
--- Accounts can be bought over and over (each buy = one more account),
--- so "one row per user per product" applies to everything else only.
+-- Accounts and requests can both be bought over and over (each buy = one
+-- more account / one more commission), so "one row per user per product"
+-- applies to everything else only.
 create unique index purchases_single_owned_idx
-  on public.purchases (user_id, mod_id) where kind <> 'account';
+  on public.purchases (user_id, mod_id)
+  where kind not in ('account', 'request');
 
 create index purchases_subscription_idx
   on public.purchases (stripe_subscription_id);
@@ -206,16 +209,26 @@ create policy "Admins remove stock"
   on public.stock_items for delete using (public.is_admin());
 
 -- Public stock COUNTS (never the credentials themselves).
--- Deliberately not security_invoker: it must bypass the row policy above
--- so shoppers can see "45 left" while the contents stay private.
-create view public.mod_stock as
+-- A security-definer FUNCTION rather than a view: it has to see past the
+-- row policy above so shoppers can read "45 left" while the contents stay
+-- private, and Postgres/Supabase treat a definer function as the proper
+-- way to do that (a definer *view* gets flagged by the linter).
+create function public.get_stock_counts()
+returns table (mod_id uuid, available integer, total integer)
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select mod_id,
-         count(*) filter (where claimed_by is null)::int as available,
-         count(*)::int as total
-    from public.stock_items
+         count(*) filter (where claimed_by is null)::int,
+         count(*)::int
+    from stock_items
    group by mod_id;
+$$;
 
-grant select on public.mod_stock to anon, authenticated;
+revoke all on function public.get_stock_counts() from public;
+grant execute on function public.get_stock_counts() to anon, authenticated;
 
 -- ---------- Granting a product (the one place a purchase is created) ----------
 
@@ -266,6 +279,13 @@ begin
     update stock_items
        set claimed_by = p_user, claimed_at = now(), purchase_id = v_purchase
      where id = v_item;
+
+  elsif v_kind = 'request' then
+    -- Every commission is its own job, so every payment is its own row.
+    insert into purchases (user_id, mod_id, amount_cents, stripe_session_id, kind)
+    values (p_user, p_mod, p_amount, p_session, v_kind)
+    returning id into v_purchase;
+
   else
     insert into purchases (
       user_id, mod_id, amount_cents, stripe_session_id, kind,
@@ -276,7 +296,7 @@ begin
       p_subscription,
       case when v_kind = 'subscription' then 'active' else null end
     )
-    on conflict (user_id, mod_id) where kind <> 'account'
+    on conflict (user_id, mod_id) where kind not in ('account', 'request')
     do update set
       amount_cents           = excluded.amount_cents,
       stripe_session_id      = coalesce(excluded.stripe_session_id, purchases.stripe_session_id),
@@ -332,6 +352,82 @@ $$;
 revoke all on function public.claim_free_product(uuid) from public;
 grant execute on function public.claim_free_product(uuid) to authenticated;
 
+-- ---------- Requests (paid custom-mod commissions) ----------
+-- Someone buys a request-kind product, writes a brief, and you deliver
+-- the finished file against it.
+
+create table public.requests (
+  id uuid primary key default gen_random_uuid(),
+  purchase_id uuid not null unique references public.purchases (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  mod_id uuid not null references public.mods (id) on delete cascade,
+  title text not null,
+  game text,
+  details text not null,
+  reference_url text,
+  status text not null default 'new'
+    check (status in ('new', 'in_progress', 'delivered', 'declined')),
+  admin_note text,
+  file_path text,                     -- the finished mod, in the private bucket
+  delivered_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index requests_user_idx on public.requests (user_id);
+create index requests_status_idx on public.requests (status);
+
+alter table public.requests enable row level security;
+
+create policy "Requests are visible to their owner"
+  on public.requests for select
+  using (user_id = auth.uid() or public.is_admin());
+
+-- The paywall: a brief can only be opened against a purchase that belongs
+-- to you AND was for a request-kind product. No payment, no purchase row,
+-- no request.
+create policy "Buyers open their own request"
+  on public.requests for insert
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+        from public.purchases p
+        join public.mods m on m.id = p.mod_id
+       where p.id = requests.purchase_id
+         and p.user_id = auth.uid()
+         and m.kind = 'request'
+    )
+  );
+
+-- Buyers may keep editing the brief until work starts, and can never set
+-- the status or attach the delivery file themselves.
+create policy "Buyers edit a request until work starts"
+  on public.requests for update
+  using (auth.uid() = user_id and status = 'new')
+  with check (auth.uid() = user_id and status = 'new' and file_path is null);
+
+create policy "Admins manage requests"
+  on public.requests for update
+  using (public.is_admin()) with check (public.is_admin());
+
+create function public.touch_request_updated()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  if new.status = 'delivered' and old.status is distinct from 'delivered' then
+    new.delivered_at = now();
+  end if;
+  return new;
+end;
+$$;
+
+create trigger requests_touch_updated
+  before update on public.requests
+  for each row execute function public.touch_request_updated();
+
 -- ---------- Ratings (1–5 stars, owners only, one per user per product) ----------
 
 create table public.ratings (
@@ -376,19 +472,34 @@ create view public.mod_ratings with (security_invoker = true) as
   from public.ratings
   group by mod_id;
 
--- ---------- Store-wide counters (the home page "Facts" band) ----------
--- Not security_invoker on purpose: it must see past the per-user
--- policy on purchases to publish a plain total. Only aggregates leave.
+-- ---------- Store-wide counters (the home page trust badge) ----------
+-- Definer function for the same reason as get_stock_counts(): it must see
+-- past the per-user policy on purchases to publish a plain total. Only
+-- aggregates ever leave.
 
-create view public.store_stats as
+create function public.get_store_stats()
+returns table (
+  customers integer,
+  sales integer,
+  products integer,
+  downloads integer,
+  avg_rating numeric
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select
-    (select count(*) from public.profiles)::int                          as customers,
-    (select count(*) from public.purchases)::int                         as sales,
-    (select count(*) from public.mods where published)::int              as products,
-    (select coalesce(sum(downloads), 0) from public.mods)::int           as downloads,
-    (select round(avg(stars)::numeric, 1) from public.ratings)           as avg_rating;
+    (select count(*) from profiles)::int,
+    (select count(*) from purchases)::int,
+    (select count(*) from mods where published)::int,
+    (select coalesce(sum(downloads), 0) from mods)::int,
+    (select round(avg(stars)::numeric, 1) from ratings);
+$$;
 
-grant select on public.store_stats to anon, authenticated;
+revoke all on function public.get_store_stats() from public;
+grant execute on function public.get_store_stats() to anon, authenticated;
 
 -- ---------- Storage buckets ----------
 
@@ -417,22 +528,30 @@ create policy "Buyers can read mod files"
   on storage.objects for select
   using (
     bucket_id = 'mod-files'
-    and exists (
-      select 1 from public.mods m
-      where m.file_path = storage.objects.name
-        and m.published = true
-        and (
-          (m.price_cents = 0 and m.kind = 'mod')
-          or exists (
-            select 1 from public.purchases p
-            where p.mod_id = m.id
-              and p.user_id = auth.uid()
-              and (
-                p.kind <> 'subscription'
-                or coalesce(p.sub_status, '') in ('active', 'trialing')
-              )
+    and (
+      exists (
+        select 1 from public.mods m
+        where m.file_path = storage.objects.name
+          and m.published = true
+          and (
+            (m.price_cents = 0 and m.kind = 'mod')
+            or exists (
+              select 1 from public.purchases p
+              where p.mod_id = m.id
+                and p.user_id = auth.uid()
+                and (
+                  p.kind <> 'subscription'
+                  or coalesce(p.sub_status, '') in ('active', 'trialing')
+                )
+            )
           )
-        )
+      )
+      -- …plus the finished file for a commission you paid for
+      or exists (
+        select 1 from public.requests r
+        where r.file_path = storage.objects.name
+          and (r.user_id = auth.uid() or public.is_admin())
+      )
     )
   );
 
@@ -444,6 +563,7 @@ alter publication supabase_realtime add table public.mods;
 alter publication supabase_realtime add table public.purchases;
 alter publication supabase_realtime add table public.ratings;
 alter publication supabase_realtime add table public.stock_items;
+alter publication supabase_realtime add table public.requests;
 
 -- ============================================================
 -- AFTER RUNNING THIS: make yourself the admin.

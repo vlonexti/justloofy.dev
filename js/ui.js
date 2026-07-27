@@ -49,6 +49,7 @@ export function priceCaption(product) {
   const kind = kindOf(product);
   if (product.price_cents === 0) return "No charge";
   if (kind === "account") return "Per account";
+  if (kind === "request") return "Per commission";
   if (kind === "subscription") return "Billed " + intervalLabel(product, true);
   return "One-time";
 }
@@ -123,6 +124,7 @@ export function productCardHtml(product) {
     kind === "mod" ? `<span>v${esc(product.version ?? "1.0.0")}</span>` : "",
     kind === "account" && product._stock ? `<span>${product._stock.total - product._stock.available} sold</span>` : "",
     kind === "subscription" ? `<span>Cancel any time</span>` : "",
+    kind === "request" ? `<span>Built to order</span>` : "",
     wasUpdated(product) ? `<span>Updated ${formatDate(product.updated_at)}</span>` : "",
   ]
     .filter(Boolean)

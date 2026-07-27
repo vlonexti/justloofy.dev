@@ -51,7 +51,9 @@ new MutationObserver((mutations) => {
 /** Count an element's text up from 0 to `to` with easing. */
 export function animateCount(el, to, { duration = 1400, format = (n) => n.toLocaleString() } = {}) {
   if (!el) return;
-  if (reduced || to === 0) {
+  // requestAnimationFrame never fires in a background tab, so anyone who
+  // opens the site in one would be left staring at the placeholder.
+  if (reduced || to === 0 || document.hidden) {
     el.textContent = format(to);
     return;
   }

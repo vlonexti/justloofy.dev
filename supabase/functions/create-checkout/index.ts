@@ -71,8 +71,9 @@ Deno.serve(async (req) => {
       if (!count) return json({ error: "Sold out — nothing left in stock." }, 409);
     }
 
-    // Mods and subscriptions are one-per-customer; accounts can be re-bought
-    if (kind !== "account") {
+    // Mods and subscriptions are one-per-customer. Accounts and requests can
+    // be bought again and again — each buy is another account / another job.
+    if (kind !== "account" && kind !== "request") {
       const { data: existing } = await supabase
         .from("purchases")
         .select("id, kind, sub_status")

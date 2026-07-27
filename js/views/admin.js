@@ -1,6 +1,7 @@
 import {
   isLive, getSession, getMyProfile, getProducts, getStockMap, saveProduct, deleteProduct,
-  uploadImage, uploadProductFile, addStock, clearUnsoldStock, KINDS, kindOf,
+  uploadImage, uploadProductFile, addStock, clearUnsoldStock,
+  getAllRequests, updateRequest, KINDS, kindOf, REQUEST_STATUS,
 } from "../db.js";
 import { money, esc, toast, formatDate, intervalLabel, pageTitle } from "../ui.js";
 
@@ -8,6 +9,7 @@ const KIND_HELP = {
   mod: "A file everyone who buys it downloads. Bump the version and upload a new .zip to push an update.",
   account: "Sells one line at a time from a pile you upload. Each buyer gets their own line, and the store shows how many are left.",
   subscription: "A recurring Stripe payment. Buyers keep access while it's active and can cancel themselves.",
+  request: "Someone pays you to build something custom. After paying they write a brief, and you deliver the finished file from the Requests tab.",
 };
 
 export async function adminView(app) {
@@ -15,14 +17,28 @@ export async function adminView(app) {
 
   let products = [];
   let stock = {};
+  let requests = [];
   let editing = null;      // product being edited, or null for "new"
   let draftKind = "mod";   // which kind the form is currently set to
+  let tab = "catalogue";   // catalogue | requests
 
   const head = `
     <div class="page-head">
       <h1>Admin panel</h1>
       <p>Add, edit, restock, and manage everything in the store.</p>
     </div>`;
+
+  const openRequests = () =>
+    requests.filter((r) => r.status === "new" || r.status === "in_progress").length;
+
+  function tabsHtml() {
+    const pending = openRequests();
+    return `
+      <div class="chips" style="margin-bottom:26px">
+        <button class="chip ${tab === "catalogue" ? "active" : ""}" data-tab="catalogue">📦 Catalogue <span style="opacity:.6">${products.length}</span></button>
+        <button class="chip ${tab === "requests" ? "active" : ""}" data-tab="requests">✍️ Requests <span style="opacity:.6">${requests.length}</span>${pending ? ` <span class="pill warn" style="margin-left:6px">${pending} open</span>` : ""}</button>
+      </div>`;
+  }
 
   function denied(message) {
     app.innerHTML = `<div class="container">${head}
@@ -147,6 +163,7 @@ export async function adminView(app) {
                 <input id="f-file" type="file">
               </div>
               ${kind === "account" ? `<p class="field-hint">Optional for accounts — most account listings don't need one.</p>` : ""}
+              ${kind === "request" ? `<p class="field-hint">Leave empty — you deliver each commission's file from the Requests tab.</p>` : ""}
             </div>
           </div>
 
@@ -215,7 +232,9 @@ export async function adminView(app) {
             ? `<span class="pill ${s?.available ? "on" : "off"}">${s?.available ?? 0} left</span>`
             : kind === "subscription"
               ? `<span class="pill neutral">${intervalLabel(p, true)}</span>`
-              : `${(p.downloads ?? 0).toLocaleString()} ⬇`;
+              : kind === "request"
+                ? `<span class="pill neutral">${requests.filter((r) => r.mod_id === p.id).length} requests</span>`
+                : `${(p.downloads ?? 0).toLocaleString()} ⬇`;
 
         return `
         <tr>
@@ -255,12 +274,143 @@ export async function adminView(app) {
       </div>`;
   }
 
+  // ---------- requests ----------
+
+  function requestCardHtml(request, index) {
+    const status = REQUEST_STATUS[request.status] ?? REQUEST_STATUS.new;
+    const who = request._username ?? request.user_id.slice(0, 8);
+
+    return `
+      <div class="request-card">
+        <div class="request-head">
+          <div>
+            <b>${esc(request.title)}</b>
+            <div class="field-hint" style="margin:4px 0 0">
+              ${esc(who)} · ${esc(request.mods?.title ?? "commission")}
+              ${request.game ? ` · ${esc(request.game)}` : ""}
+              · ${esc(formatDate(request.created_at))}
+            </div>
+          </div>
+          <span class="pill ${status.tone}">${esc(status.label)}</span>
+        </div>
+
+        <p class="request-details">${esc(request.details)}</p>
+        ${request.reference_url
+          ? `<p class="field-hint"><a href="${esc(request.reference_url)}" target="_blank" rel="noopener" style="text-decoration:underline">${esc(request.reference_url)}</a></p>`
+          : ""}
+
+        <div class="field-row" style="margin-top:16px">
+          <div class="field">
+            <label for="rq-status-${index}">Status</label>
+            <select id="rq-status-${index}">
+              ${Object.entries(REQUEST_STATUS)
+                .map(([id, s]) => `<option value="${id}" ${request.status === id ? "selected" : ""}>${esc(s.label)}</option>`)
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label>Finished build ${request.file_path ? "(replace)" : ""}</label>
+            <div class="file-input">
+              <label class="btn btn-ghost btn-sm" for="rq-file-${index}">📦 Choose file</label>
+              <span class="file-name ${request.file_path ? "chosen" : ""}" id="rq-file-name-${index}">${
+                request.file_path ? "✓ Delivered — pick a file to replace it" : "No file selected"
+              }</span>
+              <input id="rq-file-${index}" type="file">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="rq-note-${index}">Note back to the buyer (they see this)</label>
+          <textarea id="rq-note-${index}" style="min-height:80px" placeholder="Started on it — should be with you Friday.">${esc(request.admin_note ?? "")}</textarea>
+        </div>
+
+        <button class="btn btn-primary btn-sm rq-save" data-id="${esc(request.id)}" data-i="${index}">Save</button>
+        <p class="field-hint" style="margin-top:10px">
+          Uploading a file and setting the status to <b>Delivered</b> puts the download straight in their library.
+        </p>
+      </div>`;
+  }
+
+  function requestsHtml() {
+    if (!requests.length) {
+      return `<div class="empty">
+        <div class="big">✍️</div>
+        <p style="margin:0 0 6px">No requests yet.</p>
+        <p class="field-hint" style="margin:0">
+          Create a product with the <b>Request</b> type and people can commission custom work.
+          Their brief lands here the moment they've paid.
+        </p>
+      </div>`;
+    }
+    return `
+      <div class="panel reveal">
+        <h2>Requests (${requests.length})</h2>
+        <p class="panel-sub">Nobody can open a request without paying first — every card below is already paid for.</p>
+        <div class="request-list">${requests.map(requestCardHtml).join("")}</div>
+      </div>`;
+  }
+
+  function wireRequests() {
+    app.querySelectorAll('[id^="rq-file-"]').forEach((input) => {
+      if (input.type !== "file") return;
+      const i = input.id.replace("rq-file-", "");
+      input.addEventListener("change", () => {
+        const file = input.files[0];
+        if (!file) return;
+        const nameEl = app.querySelector(`#rq-file-name-${i}`);
+        nameEl.textContent = `✓ ${file.name}`;
+        nameEl.classList.add("chosen");
+      });
+    });
+
+    app.querySelectorAll(".rq-save").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        const i = btn.dataset.i;
+        btn.disabled = true;
+        btn.textContent = "Saving…";
+        try {
+          const patch = {
+            status: app.querySelector(`#rq-status-${i}`).value,
+            admin_note: app.querySelector(`#rq-note-${i}`).value.trim() || null,
+          };
+          const file = app.querySelector(`#rq-file-${i}`).files[0];
+          if (file) {
+            btn.textContent = "Uploading build…";
+            patch.file_path = await uploadProductFile(file);
+          }
+          await updateRequest(btn.dataset.id, patch);
+          toast("Request updated.", "success");
+          await reload();
+        } catch (err) {
+          toast(err.message, "error");
+          btn.disabled = false;
+          btn.textContent = "Save";
+        }
+      })
+    );
+  }
+
   // ---------- wiring ----------
 
   function render() {
+    const body =
+      tab === "requests"
+        ? requestsHtml()
+        : `${formHtml(editing ?? {})}${tableHtml()}`;
+
     app.innerHTML = `<div class="container">${head}
-      <div style="padding:10px 0 80px">${formHtml(editing ?? {})}${tableHtml()}</div>
+      <div style="padding:10px 0 80px">${tabsHtml()}${body}</div>
     </div>`;
+
+    app.querySelectorAll("[data-tab]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        tab = btn.dataset.tab;
+        render();
+      })
+    );
+
+    if (tab === "requests") return wireRequests();
 
     app.querySelector("#product-form").addEventListener("submit", onSave);
 
@@ -429,9 +579,10 @@ export async function adminView(app) {
   }
 
   async function reload({ keepEditing = false } = {}) {
-    [products, stock] = await Promise.all([
+    [products, stock, requests] = await Promise.all([
       getProducts({ includeUnpublished: true }),
       getStockMap().catch(() => ({})),
+      getAllRequests().catch(() => []),
     ]);
     if (keepEditing && editing) {
       editing = products.find((p) => p.id === editing.id) ?? editing;

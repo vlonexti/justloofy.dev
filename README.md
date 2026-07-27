@@ -1,4 +1,4 @@
-# 🌒 JustLoofy — justloofy.dev
+# 0o777 — justloofy.dev
 
 A store that runs **100% on free tiers** and sells three different kinds of thing:
 
@@ -7,6 +7,7 @@ A store that runs **100% on free tiers** and sells three different kinds of thin
 | 🧩 **Mod** | A file (usually a `.zip`) | Download link, re-downloadable forever, free updates |
 | 🔑 **Account** | One line out of a pile you upload | One account is reserved per sale, with a live "45 left" counter |
 | 🔁 **Subscription** | Recurring access | Stripe subscription, cancellable by the buyer |
+| ✍️ **Request** | A mod built to their spec | They pay, write a brief, you deliver the finished file |
 
 | Piece | Service | Cost |
 |---|---|---|
@@ -16,6 +17,54 @@ A store that runs **100% on free tiers** and sells three different kinds of thin
 | Domain | justloofy.dev | Only thing you pay for |
 
 The site works in **demo mode** (sample products, no accounts) out of the box.
+
+---
+
+## Renaming the store
+
+The name lives in **one place** — [`js/config.js`](js/config.js):
+
+```js
+SITE_NAME: "0o777",
+BRAND: { lead: "0o", accent: "777" },   // the logo is drawn as lead + accent
+SITE_TAGLINE: "Mods, Accounts & Subscriptions",
+```
+
+That drives the header logo, the footer, every page title, and the "Join …"
+copy on the signup tab. Two extra spots are plain HTML because they have to be
+readable before any JavaScript runs — the `<title>` and the `og:` tags in
+[`index.html`](index.html). The artwork is [`assets/favicon.svg`](assets/favicon.svg).
+
+The **domain** is separate from the name: the site is branded 0o777 but still
+served from `justloofy.dev` (see "Changing the domain" below).
+
+---
+
+## ⚠️ Latest migration — run `upgrade-v3.sql`
+
+If you've already run `upgrade-v2.sql`, run
+[`supabase/upgrade-v3.sql`](supabase/upgrade-v3.sql) next. It does two things:
+
+1. **Clears the "Security Definer view" warnings** on `mod_stock` and
+   `store_stats` in the Table Editor, by replacing both views with
+   security-definer *functions* — the pattern Postgres and Supabase actually
+   sanction for this. The views are dropped, so the warnings disappear rather
+   than being suppressed.
+
+   > 🚫 **Do not press "Autofix"** on that warning in the dashboard. Autofix
+   > sets `security_invoker = true`, which makes the row policy on
+   > `stock_items` apply to the counts — every shopper would then see
+   > "0 left" on every account listing. This migration is the correct fix.
+
+   Nothing was leaking: those views only ever exposed aggregate numbers
+   (how many accounts are left, how many customers there are), never the
+   credentials or anyone's purchase rows. The warning is about the *mechanism*,
+   not about a hole.
+
+2. **Adds the `request` product kind** — paid custom-mod commissions (below).
+
+Also redeploy the `create-checkout` edge function; it changed so a request can
+be bought more than once.
 
 ---
 
@@ -47,6 +96,49 @@ subscriptions") so the billing portal works.
 
 Fresh projects: just run [`supabase/schema.sql`](supabase/schema.sql) — it already
 contains everything.
+
+---
+
+## Troubleshooting
+
+### "Could not find a relationship between 'purchases' and 'stock_items' in the schema cache"
+
+The SQL ran fine — **PostgREST's schema cache is just stale**. Supabase's API
+keeps a cached picture of your tables and it doesn't always notice new ones
+straight away. Fix it in the SQL Editor:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+It usually clears itself within a minute anyway. The site now degrades
+gracefully either way: if the join can't resolve, the library still loads,
+just without account credentials, instead of showing an error.
+
+### The site looks like the old version after a deploy
+
+GitHub Pages and your browser both cache aggressively. **Ctrl+F5** (hard
+reload). If you're testing locally, the same applies to the ES modules under
+`js/` — a normal refresh can keep serving the old file.
+
+### Changing the domain
+
+You can't rename a domain at name.com (or any registrar) — a domain name is the
+product, so "renaming" means **registering a different one** and pointing it at
+the site. Two options:
+
+1. **Move to the new domain** — buy it, then add the same four `A` records and
+   the `www` `CNAME` from Part 1, put the new name in GitHub → Settings → Pages
+   → Custom domain, update the `CNAME` file in this repo, then update
+   `SITE_URL` in [`js/config.js`](js/config.js), the `SITE_URL` Supabase secret,
+   and the Site URL + redirect URLs under Supabase → Authentication. Missing any
+   of those last three breaks checkout returns or sign-in emails.
+2. **Keep justloofy.dev and just forward** — name.com → Domain Actions → **URL
+   Forwarding** on the new domain, pointing at `https://justloofy.dev`. Cheapest
+   option, but the old name stays visible in the address bar.
+
+Either way, keep the old domain registered and forwarding for a while so
+existing links and Discord posts don't die.
 
 ---
 
@@ -190,6 +282,30 @@ straight in — **one account per line** (e.g. `user@mail.com:password`).
 Accounts are the one kind a customer can buy **more than once** — each purchase
 hands out one more from the pile.
 
+### ✍️ A request (paid custom-mod commission)
+
+Create a product with the **Request** type and a price — that's your commission
+slot. Leave the file field empty; you deliver each job individually.
+
+What happens:
+
+1. Someone buys it. Requests can be bought repeatedly — two commissions are two
+   separate jobs, so each payment gets its own row.
+2. Straight after paying, a **brief form** appears on their library page: what
+   they want made, the game, full details, and an optional reference link.
+   **Nobody can open a brief without a paid purchase behind it** — that's
+   enforced by a database policy, not by hiding the form.
+3. It lands in **Admin → Requests**, showing who asked, what for, and when.
+4. You set the status (*Awaiting brief → Being built → Delivered*, or
+   *Declined*), leave a note the buyer can read, and **upload the finished
+   mod** right on the card.
+5. Setting the status to **Delivered** with a file attached puts a download
+   button straight in their library. Only that buyer (and you) can read the
+   file.
+
+Buyers can keep editing their brief while the status is still *Awaiting brief*;
+once you mark it *Being built*, it locks so the spec can't move under you.
+
 ### 🔁 A subscription
 Set the price and how often it bills (every 1 month, every 3 months, every year…).
 Buyers get a Stripe subscription and a **Manage or cancel** button that opens
@@ -206,7 +322,7 @@ under **Settings → Appearance** (reachable from the ⚙ in the header, signed 
 not); the choice is saved in their browser and applied before first paint, so
 there's no flash on reload.
 
-Shipped themes: **Void** (default, monochrome), **Ember** (the classic red),
+Shipped themes: **Void** (default, monochrome), **Ember** (red/orange),
 **Aurora**, **Nebula**, **Sakura**, and **Daylight** (light mode).
 
 To add one: append a block to the theme list at the top of
@@ -253,7 +369,8 @@ js/ui.js                            shared header/footer/cards/toasts
 js/app.js                           router + realtime
 js/views/                           one file per page
 supabase/schema.sql                 database setup for a FRESH project
-supabase/upgrade-v2.sql             migration for a project that ran the old schema
+supabase/upgrade-v2.sql             migration: product kinds, stock, subscriptions
+supabase/upgrade-v3.sql             migration: definer-view fix + paid requests
 supabase/functions/                 the three Stripe edge functions
 CNAME                               tells GitHub Pages about justloofy.dev
 ```

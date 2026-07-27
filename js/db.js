@@ -25,6 +25,15 @@ export const KINDS = {
   mod: { label: "Mod", icon: "🧩", noun: "mod" },
   account: { label: "Account", icon: "🔑", noun: "account" },
   subscription: { label: "Subscription", icon: "🔁", noun: "subscription" },
+  request: { label: "Request", icon: "✍️", noun: "commission" },
+};
+
+/** Where a paid commission is up to. */
+export const REQUEST_STATUS = {
+  new: { label: "Awaiting brief", tone: "neutral" },
+  in_progress: { label: "Being built", tone: "warn" },
+  delivered: { label: "Delivered", tone: "ok" },
+  declined: { label: "Declined", tone: "bad" },
 };
 
 export const kindOf = (p) => (p?.kind in KINDS ? p.kind : "mod");
@@ -257,10 +266,10 @@ export async function getStockMap() {
     for (const p of DEMO_PRODUCTS) if (p._stock) map[p.id] = { ...p._stock };
     return map;
   }
-  const { data, error } = await supabase.from("mod_stock").select("*");
+  const { data, error } = await supabase.rpc("get_stock_counts");
   if (error) throw error;
   const map = {};
-  for (const row of data) map[row.mod_id] = { available: row.available, total: row.total };
+  for (const row of data ?? []) map[row.mod_id] = { available: row.available, total: row.total };
   return map;
 }
 
@@ -288,8 +297,9 @@ export async function getStoreStats() {
       avg_rating: 5,
     };
   }
-  const { data, error } = await supabase.from("store_stats").select("*").maybeSingle();
+  const { data: rows, error } = await supabase.rpc("get_store_stats");
   if (error) throw error;
+  const data = rows?.[0];
   return {
     customers: data?.customers ?? 0,
     sales: data?.sales ?? 0,
@@ -395,6 +405,111 @@ export async function getDownloadUrl(product) {
     .createSignedUrl(product.file_path, 60);
   if (error) throw error;
   supabase.rpc("increment_downloads", { mod: product.id }).then(() => {});
+  return data.signedUrl;
+}
+
+// ---------- Requests (paid custom-mod commissions) ----------
+
+/**
+ * Purchases of request-kind products that don't have a brief written yet.
+ * These are what the library turns into "tell me what you want" forms.
+ */
+export async function getMyRequests() {
+  if (!isLive) return [];
+  const session = await getSession();
+  if (!session) return [];
+  const { data, error } = await supabase
+    .from("requests")
+    .select("*, mods(title, game, image_url)")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+/** Write the brief for a commission that has already been paid for. */
+export async function createRequest({ purchaseId, modId, title, game, details, referenceUrl }) {
+  if (!isLive) throw demoError();
+  const session = await getSession();
+  if (!session) throw new Error("Sign in first.");
+  const { data, error } = await supabase
+    .from("requests")
+    .insert({
+      purchase_id: purchaseId,
+      user_id: session.user.id,
+      mod_id: modId,
+      title,
+      game: game || null,
+      details,
+      reference_url: referenceUrl || null,
+    })
+    .select()
+    .single();
+  if (error) {
+    if (error.code === "23505") throw new Error("You've already sent the brief for this one.");
+    if (/row-level security/i.test(error.message)) {
+      throw new Error("That commission hasn't been paid for yet.");
+    }
+    throw error;
+  }
+  return data;
+}
+
+/** Buyers can still tweak the brief while the status is "new". */
+export async function updateRequestBrief(id, { title, game, details, referenceUrl }) {
+  if (!isLive) throw demoError();
+  const { error } = await supabase
+    .from("requests")
+    .update({ title, game: game || null, details, reference_url: referenceUrl || null })
+    .eq("id", id);
+  if (error) {
+    if (/row-level security/i.test(error.message)) {
+      throw new Error("This one is already being worked on — message me instead of editing it.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Every request in the store — admins only (RLS enforces it).
+ * Usernames come from a second query: requests.user_id points at
+ * auth.users, so PostgREST can't join it to profiles on its own.
+ */
+export async function getAllRequests() {
+  if (!isLive) return [];
+  const { data, error } = await supabase
+    .from("requests")
+    .select("*, mods(title, game)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const ids = [...new Set(data.map((r) => r.user_id))];
+  if (ids.length) {
+    const { data: people } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", ids);
+    const names = Object.fromEntries((people ?? []).map((p) => [p.id, p.username]));
+    for (const r of data) r._username = names[r.user_id] ?? null;
+  }
+  return data;
+}
+
+/** Admin side: move a request along, leave a note, attach the finished file. */
+export async function updateRequest(id, patch) {
+  if (!isLive) throw demoError();
+  const { error } = await supabase.from("requests").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+/** Signed URL for a delivered commission file (valid 60s). */
+export async function getRequestDownloadUrl(request) {
+  if (!isLive) throw demoError();
+  if (!request.file_path) throw new Error("Nothing has been delivered for this one yet.");
+  const { data, error } = await supabase.storage
+    .from("mod-files")
+    .createSignedUrl(request.file_path, 60);
+  if (error) throw error;
   return data.signedUrl;
 }
 

@@ -6,6 +6,7 @@ const KIND_TABS = [
   { id: "mod", label: `${KINDS.mod.icon} Mods` },
   { id: "account", label: `${KINDS.account.icon} Accounts` },
   { id: "subscription", label: `${KINDS.subscription.icon} Subscriptions` },
+  { id: "request", label: `${KINDS.request.icon} Requests` },
 ];
 
 export async function productsView(app, { params }) {
