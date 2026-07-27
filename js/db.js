@@ -33,8 +33,13 @@ export const REQUEST_STATUS = {
   new: { label: "Awaiting brief", tone: "neutral" },
   in_progress: { label: "Being built", tone: "warn" },
   delivered: { label: "Delivered", tone: "ok" },
+  closed: { label: "Closed", tone: "neutral" },
   declined: { label: "Declined", tone: "bad" },
 };
+
+/** Requests you've finished with — archived for you, still live for the buyer. */
+export const isRequestOpen = (request) =>
+  !["closed", "declined"].includes(request?.status);
 
 export const kindOf = (p) => (p?.kind in KINDS ? p.kind : "mod");
 

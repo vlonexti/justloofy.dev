@@ -1318,7 +1318,26 @@ select option { background: var(--surface-2); color: var(--text); }
   border-radius: var(--radius);
   background: var(--surface-2);
   padding: 20px;
+  transition: opacity 0.2s ease;
 }
+/* Finished jobs sink and fade, but stay reachable — the buyer still has it */
+.request-card.is-closed { opacity: 0.55; }
+.request-card.is-closed:hover { opacity: 1; }
+
+/* The "your build is ready" strip in the buyer's library */
+.delivery-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(52, 214, 127, 0.35);
+  border-radius: 12px;
+  background: var(--ok-soft);
+}
+.delivery-box b { font-size: 0.92rem; }
 
 /* ---------- Utility blocks ---------- */
 

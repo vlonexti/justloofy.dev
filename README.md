@@ -40,7 +40,22 @@ served from `justloofy.dev` (see "Changing the domain" below).
 
 ---
 
-## ⚠️ Latest migration — run `upgrade-v3.sql`
+## ⚠️ Latest migration — run `upgrade-v4.sql`
+
+[`supabase/upgrade-v4.sql`](supabase/upgrade-v4.sql) adds the **Closed** status
+for requests, and fixes `delivered_at` so it's stamped the moment a build is
+attached rather than only when the status is flipped.
+
+Until you run it, the **Close this job** button will fail with a check-constraint
+error — `closed` isn't a legal status in the database yet.
+
+Closing is archive-only. The buyer keeps the request *and* the download forever:
+access to a delivered build is granted on the file plus the buyer's id, and never
+looks at the status, so nothing you do to a request can take their copy away.
+
+---
+
+## Earlier migration — `upgrade-v3.sql`
 
 If you've already run `upgrade-v2.sql`, run
 [`supabase/upgrade-v3.sql`](supabase/upgrade-v3.sql) next. It does two things:
@@ -296,15 +311,24 @@ What happens:
    **Nobody can open a brief without a paid purchase behind it** — that's
    enforced by a database policy, not by hiding the form.
 3. It lands in **Admin → Requests**, showing who asked, what for, and when.
-4. You set the status (*Awaiting brief → Being built → Delivered*, or
+4. You set the status (*Awaiting brief → Being built → Delivered → Closed*, or
    *Declined*), leave a note the buyer can read, and **upload the finished
-   mod** right on the card.
-5. Setting the status to **Delivered** with a file attached puts a download
-   button straight in their library. Only that buyer (and you) can read the
-   file.
+   mod** right on the card. Picking a file auto-moves the status to
+   *Delivered* — attaching the build **is** the delivery, so it can't sit
+   there finished but labelled "Awaiting brief".
+5. The moment a file is attached, a green **"Your build is ready"** strip with
+   a download button appears in their library. Only that buyer (and you) can
+   read the file.
+6. **Close this job** when you're done. That's archive-only: the card fades and
+   sinks in your list, and the buyer keeps the request and the download for
+   good. Reopen it any time.
 
 Buyers can keep editing their brief while the status is still *Awaiting brief*;
 once you mark it *Being built*, it locks so the spec can't move under you.
+
+On the buyer's side, the library has filter chips (Everything / Mods /
+Accounts / Subscriptions / **Requests**) so they can always pull up every
+commission they've ever paid for, open or closed.
 
 ### 🔁 A subscription
 Set the price and how often it bills (every 1 month, every 3 months, every year…).
@@ -371,6 +395,7 @@ js/views/                           one file per page
 supabase/schema.sql                 database setup for a FRESH project
 supabase/upgrade-v2.sql             migration: product kinds, stock, subscriptions
 supabase/upgrade-v3.sql             migration: definer-view fix + paid requests
+supabase/upgrade-v4.sql             migration: closing requests
 supabase/functions/                 the three Stripe edge functions
 CNAME                               tells GitHub Pages about justloofy.dev
 ```

@@ -40,6 +40,9 @@ function requestBlockHtml(purchase, request, index) {
 
   const status = REQUEST_STATUS[request.status] ?? REQUEST_STATUS.new;
   const editable = request.status === "new";
+  // The build is what matters, not the label on it — if a file has been
+  // attached, the buyer can download it whatever the status says.
+  const delivered = Boolean(request.file_path);
 
   return `
     <div class="request-block" data-i="${index}">
@@ -54,16 +57,24 @@ function requestBlockHtml(purchase, request, index) {
       ${request.admin_note
         ? `<p class="request-note"><b>Note from me:</b> ${esc(request.admin_note)}</p>`
         : ""}
-      <div class="credential-actions" style="margin-top:12px">
-        ${request.status === "delivered" && request.file_path
-          ? `<button class="btn btn-primary btn-sm req-dl-btn" data-id="${esc(request.id)}">⬇ Download the finished build</button>`
-          : ""}
-        ${editable
-          ? `<button class="btn btn-ghost btn-sm edit-brief-btn" data-id="${esc(request.id)}" data-i="${index}">Edit the brief</button>`
-          : ""}
-      </div>
+
+      ${delivered
+        ? `<div class="delivery-box">
+             <div>
+               <b>📦 Your build is ready</b>
+               <div class="field-hint" style="margin:2px 0 0">
+                 Delivered ${esc(formatDate(request.delivered_at ?? request.updated_at))} · yours to re-download any time
+               </div>
+             </div>
+             <button class="btn btn-primary btn-sm req-dl-btn" data-id="${esc(request.id)}">⬇ Download</button>
+           </div>`
+        : ""}
+
       ${editable
-        ? `<form class="brief-form" data-i="${index}" data-id="${esc(request.id)}" hidden style="margin-top:14px">
+        ? `<div class="credential-actions" style="margin-top:12px">
+             <button class="btn btn-ghost btn-sm edit-brief-btn" data-i="${index}">Edit the brief</button>
+           </div>
+           <form class="brief-form" data-i="${index}" data-id="${esc(request.id)}" hidden style="margin-top:14px">
              <div class="field-row">
                <div class="field">
                  <label for="e-title-${index}">What do you want made?</label>
@@ -190,13 +201,7 @@ export async function accountView(app) {
     (p) => kindOf(p) === "request" && !requestsByPurchase[p.id]
   ).length;
 
-  const libraryHtml = purchases.length
-    ? purchases.map((p, i) => itemHtml(p, i, requestsByPurchase)).join("")
-    : `<div class="empty" style="padding:40px 20px">
-         <div class="big">📦</div>
-         <p style="margin-bottom:18px">Your library is empty — go grab something!</p>
-         <a class="btn btn-outline btn-sm" href="#/products">Browse the store</a>
-       </div>`;
+  let filter = "all";
 
   app.innerHTML = `<div class="container">${head}
     <div class="account-grid">
@@ -220,114 +225,159 @@ export async function accountView(app) {
             ? `<br><b style="color:var(--warn)">${awaitingBrief} commission${awaitingBrief === 1 ? "" : "s"} still need${awaitingBrief === 1 ? "s" : ""} a brief — fill it in below so I can start.</b>`
             : ""}
         </p>
-        <div id="library">${libraryHtml}</div>
+        <div class="chips" id="library-filter" style="margin-bottom:18px"></div>
+        <div id="library"></div>
       </div>
     </div></div>`;
 
-  app.querySelector("#signout-btn").addEventListener("click", async () => {
-    await signOut();
-    location.hash = "#/";
-  });
+  // ---- filter + list ----
 
-  app.querySelectorAll(".reveal-btn").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const box = app.querySelector(`.credential-box[data-box="${btn.dataset.box}"]`);
-      const masked = box.classList.toggle("masked");
-      btn.textContent = masked ? "👁 Reveal" : "🙈 Hide";
-    })
-  );
+  function paint() {
+    // Only offer filters for things this person actually owns, so the row
+    // stays short. Requests are always worth their own tab once one exists.
+    const owned = [...new Set(purchases.map((p) => kindOf(p)))];
+    const chips = app.querySelector("#library-filter");
+    chips.innerHTML =
+      owned.length > 1
+        ? [["all", "Everything"], ...owned.map((k) => [k, `${KINDS[k].icon} ${KINDS[k].label}s`])]
+            .map(([id, label]) => {
+              const n = id === "all" ? purchases.length : purchases.filter((p) => kindOf(p) === id).length;
+              return `<button class="chip ${id === filter ? "active" : ""}" data-filter="${id}">${label} <span style="opacity:.6">${n}</span></button>`;
+            })
+            .join("")
+        : "";
 
-  app.querySelectorAll(".copy-btn").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(btn.dataset.copy);
-        toast("Copied to your clipboard.", "success");
-      } catch {
-        toast("Your browser blocked the clipboard — select the text and copy it manually.", "error");
-      }
-    })
-  );
+    chips.querySelectorAll(".chip").forEach((chip) =>
+      chip.addEventListener("click", () => {
+        filter = chip.dataset.filter;
+        paint();
+      })
+    );
 
-  app.querySelectorAll(".edit-brief-btn").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const form = app.querySelector(`form.brief-form[data-i="${btn.dataset.i}"]`);
-      if (form) form.hidden = !form.hidden;
-    })
-  );
+    const shown = purchases.filter((p) => filter === "all" || kindOf(p) === filter);
+    const list = app.querySelector("#library");
 
-  app.querySelectorAll("form.brief-form").forEach((form) =>
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = form.querySelector("button[type=submit]");
-      const original = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Sending…";
+    list.innerHTML = shown.length
+      ? shown.map((p) => itemHtml(p, purchases.indexOf(p), requestsByPurchase)).join("")
+      : `<div class="empty" style="padding:40px 20px">
+           <div class="big">📦</div>
+           <p style="margin-bottom:18px">${
+             purchases.length ? "Nothing of that kind yet." : "Your library is empty — go grab something!"
+           }</p>
+           <a class="btn btn-outline btn-sm" href="#/products">Browse the store</a>
+         </div>`;
 
-      const brief = {
-        title: form.title.value.trim(),
-        game: form.game.value.trim(),
-        details: form.details.value.trim(),
-        referenceUrl: form.reference.value.trim(),
-      };
+    wireLibrary();
+  }
 
-      try {
-        if (form.dataset.id) {
-          await updateRequestBrief(form.dataset.id, brief);
-          toast("Brief updated.", "success");
-        } else {
-          await createRequest({
-            purchaseId: form.dataset.purchase,
-            modId: form.dataset.mod,
-            ...brief,
-          });
-          toast("Brief sent — I'll get started on it.", "success");
+  // Scoped to #library on purpose: this re-runs on every repaint, and
+  // querying the whole page would stack a fresh listener on the sidebar
+  // buttons each time.
+  function wireLibrary() {
+    const scope = app.querySelector("#library");
+
+    scope.querySelectorAll(".reveal-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const box = scope.querySelector(`.credential-box[data-box="${btn.dataset.box}"]`);
+        const masked = box.classList.toggle("masked");
+        btn.textContent = masked ? "👁 Reveal" : "🙈 Hide";
+      })
+    );
+
+    scope.querySelectorAll(".copy-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy);
+          toast("Copied to your clipboard.", "success");
+        } catch {
+          toast("Your browser blocked the clipboard — select the text and copy it manually.", "error");
         }
-        accountView(app);
-      } catch (err) {
-        toast(err.message, "error");
-        btn.disabled = false;
-        btn.textContent = original;
-      }
-    })
-  );
+      })
+    );
 
-  app.querySelectorAll(".req-dl-btn").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      const request = requests.find((r) => r.id === btn.dataset.id);
-      if (!request) return;
-      btn.disabled = true;
-      btn.textContent = "Preparing…";
-      try {
-        location.href = await getRequestDownloadUrl(request);
-        toast("Download started!", "success");
-      } catch (err) {
-        toast(err.message, "error");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "⬇ Download the finished build";
-      }
-    })
-  );
+    scope.querySelectorAll(".edit-brief-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const form = scope.querySelector(`form.brief-form[data-i="${btn.dataset.i}"]`);
+        if (form) form.hidden = !form.hidden;
+      })
+    );
 
-  app.querySelectorAll(".dl-btn").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      const purchase = purchases.find((p) => p.mods?.id === btn.dataset.id);
-      if (!purchase) return;
-      btn.disabled = true;
-      btn.textContent = "Preparing…";
-      try {
-        location.href = await getDownloadUrl(purchase.mods);
-        toast("Download started!", "success");
-      } catch (err) {
-        toast(err.message, "error");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "⬇ Download";
-      }
-    })
-  );
+    scope.querySelectorAll("form.brief-form").forEach((form) =>
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector("button[type=submit]");
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Sending…";
 
-  app.querySelectorAll(".portal-btn").forEach((btn) =>
+        const brief = {
+          title: form.title.value.trim(),
+          game: form.game.value.trim(),
+          details: form.details.value.trim(),
+          referenceUrl: form.reference.value.trim(),
+        };
+
+        try {
+          if (form.dataset.id) {
+            await updateRequestBrief(form.dataset.id, brief);
+            toast("Brief updated.", "success");
+          } else {
+            await createRequest({
+              purchaseId: form.dataset.purchase,
+              modId: form.dataset.mod,
+              ...brief,
+            });
+            toast("Brief sent — I'll get started on it.", "success");
+          }
+          accountView(app);
+        } catch (err) {
+          toast(err.message, "error");
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      })
+    );
+
+    scope.querySelectorAll(".req-dl-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        const request = requests.find((r) => r.id === btn.dataset.id);
+        if (!request) return;
+        btn.disabled = true;
+        btn.textContent = "Preparing…";
+        try {
+          location.href = await getRequestDownloadUrl(request);
+          toast("Download started!", "success");
+        } catch (err) {
+          toast(err.message, "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "⬇ Download";
+        }
+      })
+    );
+
+    scope.querySelectorAll(".dl-btn").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        const purchase = purchases.find((p) => p.mods?.id === btn.dataset.id);
+        if (!purchase) return;
+        btn.disabled = true;
+        btn.textContent = "Preparing…";
+        try {
+          location.href = await getDownloadUrl(purchase.mods);
+          toast("Download started!", "success");
+        } catch (err) {
+          toast(err.message, "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "⬇ Download";
+        }
+      })
+    );
+
+    scope.querySelectorAll(".portal-btn").forEach(wirePortalButton);
+  }
+
+  function wirePortalButton(btn) {
     btn.addEventListener("click", async () => {
       btn.disabled = true;
       const original = btn.textContent;
@@ -339,6 +389,16 @@ export async function accountView(app) {
         btn.disabled = false;
         btn.textContent = original;
       }
-    })
-  );
+    });
+  }
+
+  paint();
+
+  // Sidebar controls live outside #library, so they're wired exactly once.
+  app.querySelectorAll(".account-grid > .panel:first-child .portal-btn").forEach(wirePortalButton);
+
+  app.querySelector("#signout-btn").addEventListener("click", async () => {
+    await signOut();
+    location.hash = "#/";
+  });
 }

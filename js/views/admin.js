@@ -1,7 +1,7 @@
 import {
   isLive, getSession, getMyProfile, getProducts, getStockMap, saveProduct, deleteProduct,
   uploadImage, uploadProductFile, addStock, clearUnsoldStock,
-  getAllRequests, updateRequest, KINDS, kindOf, REQUEST_STATUS,
+  getAllRequests, updateRequest, KINDS, kindOf, REQUEST_STATUS, isRequestOpen,
 } from "../db.js";
 import { money, esc, toast, formatDate, intervalLabel, pageTitle } from "../ui.js";
 
@@ -28,8 +28,7 @@ export async function adminView(app) {
       <p>Add, edit, restock, and manage everything in the store.</p>
     </div>`;
 
-  const openRequests = () =>
-    requests.filter((r) => r.status === "new" || r.status === "in_progress").length;
+  const openRequests = () => requests.filter(isRequestOpen).length;
 
   function tabsHtml() {
     const pending = openRequests();
@@ -281,7 +280,7 @@ export async function adminView(app) {
     const who = request._username ?? request.user_id.slice(0, 8);
 
     return `
-      <div class="request-card">
+      <div class="request-card ${isRequestOpen(request) ? "" : "is-closed"}">
         <div class="request-head">
           <div>
             <b>${esc(request.title)}</b>
@@ -325,9 +324,15 @@ export async function adminView(app) {
           <textarea id="rq-note-${index}" style="min-height:80px" placeholder="Started on it — should be with you Friday.">${esc(request.admin_note ?? "")}</textarea>
         </div>
 
-        <button class="btn btn-primary btn-sm rq-save" data-id="${esc(request.id)}" data-i="${index}">Save</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm rq-save" data-id="${esc(request.id)}" data-i="${index}">Save</button>
+          ${request.status !== "closed"
+            ? `<button class="btn btn-ghost btn-sm rq-close" data-id="${esc(request.id)}">✓ Close this job</button>`
+            : `<button class="btn btn-ghost btn-sm rq-reopen" data-id="${esc(request.id)}">↩ Reopen</button>`}
+        </div>
         <p class="field-hint" style="margin-top:10px">
-          Uploading a file and setting the status to <b>Delivered</b> puts the download straight in their library.
+          Attaching a file delivers it — the download appears in their library straight away.
+          Closing only archives it for you; they keep the request and the file for good.
         </p>
       </div>`;
   }
@@ -343,11 +348,21 @@ export async function adminView(app) {
         </p>
       </div>`;
     }
+    // Jobs still needing you float to the top; closed ones sink but stay.
+    const sorted = [...requests].sort(
+      (a, b) =>
+        Number(isRequestOpen(b)) - Number(isRequestOpen(a)) ||
+        new Date(b.created_at) - new Date(a.created_at)
+    );
+
     return `
       <div class="panel reveal">
         <h2>Requests (${requests.length})</h2>
-        <p class="panel-sub">Nobody can open a request without paying first — every card below is already paid for.</p>
-        <div class="request-list">${requests.map(requestCardHtml).join("")}</div>
+        <p class="panel-sub">
+          Nobody can open a request without paying first — every card below is already paid for.
+          ${openRequests() ? `<b style="color:var(--warn)">${openRequests()} still open.</b>` : "All caught up."}
+        </p>
+        <div class="request-list">${sorted.map(requestCardHtml).join("")}</div>
       </div>`;
   }
 
@@ -361,6 +376,15 @@ export async function adminView(app) {
         const nameEl = app.querySelector(`#rq-file-name-${i}`);
         nameEl.textContent = `✓ ${file.name}`;
         nameEl.classList.add("chosen");
+
+        // Attaching a build IS the delivery. Move the status along so it
+        // can't be saved as "Awaiting brief" with a finished file on it —
+        // still a plain select, so it can be overridden before saving.
+        const status = app.querySelector(`#rq-status-${i}`);
+        if (status && ["new", "in_progress"].includes(status.value)) {
+          status.value = "delivered";
+          toast("Marked as Delivered — hit Save to send it.", "success");
+        }
       });
     });
 
@@ -388,6 +412,26 @@ export async function adminView(app) {
           btn.textContent = "Save";
         }
       })
+    );
+
+    const setStatus = (btn, status, message) =>
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await updateRequest(btn.dataset.id, { status });
+          toast(message, "success");
+          await reload();
+        } catch (err) {
+          toast(err.message, "error");
+          btn.disabled = false;
+        }
+      });
+
+    app.querySelectorAll(".rq-close").forEach((btn) =>
+      setStatus(btn, "closed", "Closed — the buyer keeps their copy.")
+    );
+    app.querySelectorAll(".rq-reopen").forEach((btn) =>
+      setStatus(btn, "in_progress", "Reopened.")
     );
   }
 

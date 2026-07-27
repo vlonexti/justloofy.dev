@@ -366,7 +366,7 @@ create table public.requests (
   details text not null,
   reference_url text,
   status text not null default 'new'
-    check (status in ('new', 'in_progress', 'delivered', 'declined')),
+    check (status in ('new', 'in_progress', 'delivered', 'closed', 'declined')),
   admin_note text,
   file_path text,                     -- the finished mod, in the private bucket
   delivered_at timestamptz,
@@ -417,9 +417,17 @@ language plpgsql
 as $$
 begin
   new.updated_at = now();
-  if new.status = 'delivered' and old.status is distinct from 'delivered' then
+
+  -- Uploading the file IS the delivery, so stamp the date on either signal.
+  -- Closing the request afterwards must not lose it.
+  if new.delivered_at is null
+     and (
+       (new.file_path is not null and old.file_path is distinct from new.file_path)
+       or (new.status = 'delivered' and old.status is distinct from 'delivered')
+     ) then
     new.delivered_at = now();
   end if;
+
   return new;
 end;
 $$;
