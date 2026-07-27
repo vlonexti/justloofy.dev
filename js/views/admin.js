@@ -3,7 +3,9 @@ import {
   uploadImage, uploadProductFile, addStock, clearUnsoldStock,
   getAllRequests, updateRequest, KINDS, kindOf, REQUEST_STATUS, isRequestOpen,
 } from "../db.js";
-import { money, esc, toast, formatDate, intervalLabel, pageTitle } from "../ui.js";
+import { money, esc, toast, formatDate, intervalLabel, pageTitle, safeUrl } from "../ui.js";
+
+const CARET = `<span class="collapse-caret">▾</span>`;
 
 const KIND_HELP = {
   mod: "A file everyone who buys it downloads. Bump the version and upload a new .zip to push an update.",
@@ -21,6 +23,7 @@ export async function adminView(app) {
   let editing = null;      // product being edited, or null for "new"
   let draftKind = "mod";   // which kind the form is currently set to
   let tab = "catalogue";   // catalogue | requests
+  let requestTab = "open"; // open | closed | all
 
   const head = `
     <div class="page-head">
@@ -278,24 +281,32 @@ export async function adminView(app) {
   function requestCardHtml(request, index) {
     const status = REQUEST_STATUS[request.status] ?? REQUEST_STATUS.new;
     const who = request._username ?? request.user_id.slice(0, 8);
+    const open = isRequestOpen(request);
+    const link = safeUrl(request.reference_url);
 
     return `
-      <div class="request-card ${isRequestOpen(request) ? "" : "is-closed"}">
-        <div class="request-head">
-          <div>
+      <details class="collapse request-card ${open ? "" : "is-closed"}" ${open ? "open" : ""}>
+        <summary>
+          <span class="collapse-title">
             <b>${esc(request.title)}</b>
-            <div class="field-hint" style="margin:4px 0 0">
+            <small>
               ${esc(who)} · ${esc(request.mods?.title ?? "commission")}
               ${request.game ? ` · ${esc(request.game)}` : ""}
               · ${esc(formatDate(request.created_at))}
-            </div>
-          </div>
+              ${request.file_path ? " · 📦 build attached" : ""}
+            </small>
+          </span>
           <span class="pill ${status.tone}">${esc(status.label)}</span>
-        </div>
+          ${CARET}
+        </summary>
+        <div class="collapse-body">
 
         <p class="request-details">${esc(request.details)}</p>
-        ${request.reference_url
-          ? `<p class="field-hint"><a href="${esc(request.reference_url)}" target="_blank" rel="noopener" style="text-decoration:underline">${esc(request.reference_url)}</a></p>`
+        ${link
+          ? `<p class="field-hint"><a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">${esc(link)}</a></p>`
+          : ""}
+        ${request.reference_url && !link
+          ? `<p class="field-hint" style="color:var(--danger)">⚠ The buyer's reference link was blocked — it wasn't a normal http(s) address.</p>`
           : ""}
 
         <div class="field-row" style="margin-top:16px">
@@ -321,7 +332,7 @@ export async function adminView(app) {
 
         <div class="field">
           <label for="rq-note-${index}">Note back to the buyer (they see this)</label>
-          <textarea id="rq-note-${index}" style="min-height:80px" placeholder="Started on it — should be with you Friday.">${esc(request.admin_note ?? "")}</textarea>
+          <textarea id="rq-note-${index}" style="min-height:80px" maxlength="2000" placeholder="Started on it — should be with you Friday.">${esc(request.admin_note ?? "")}</textarea>
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -334,7 +345,8 @@ export async function adminView(app) {
           Attaching a file delivers it — the download appears in their library straight away.
           Closing only archives it for you; they keep the request and the file for good.
         </p>
-      </div>`;
+        </div>
+      </details>`;
   }
 
   function requestsHtml() {
@@ -348,25 +360,54 @@ export async function adminView(app) {
         </p>
       </div>`;
     }
+    const open = requests.filter(isRequestOpen);
+    const closed = requests.filter((r) => !isRequestOpen(r));
+    const buckets = { open, closed, all: requests };
+    const shown = buckets[requestTab] ?? open;
+
     // Jobs still needing you float to the top; closed ones sink but stay.
-    const sorted = [...requests].sort(
+    const sorted = [...shown].sort(
       (a, b) =>
         Number(isRequestOpen(b)) - Number(isRequestOpen(a)) ||
         new Date(b.created_at) - new Date(a.created_at)
     );
+
+    const subTabs = [
+      ["open", "Open", open.length],
+      ["closed", "Closed", closed.length],
+      ["all", "All", requests.length],
+    ]
+      .map(
+        ([id, label, n]) =>
+          `<button class="chip ${id === requestTab ? "active" : ""}" data-rtab="${id}">${label} <span style="opacity:.6">${n}</span></button>`
+      )
+      .join("");
 
     return `
       <div class="panel reveal">
         <h2>Requests (${requests.length})</h2>
         <p class="panel-sub">
           Nobody can open a request without paying first — every card below is already paid for.
-          ${openRequests() ? `<b style="color:var(--warn)">${openRequests()} still open.</b>` : "All caught up."}
+          ${open.length ? `<b style="color:var(--warn)">${open.length} still open.</b>` : "All caught up."}
         </p>
-        <div class="request-list">${sorted.map(requestCardHtml).join("")}</div>
+        <div class="chips" style="margin-bottom:20px">${subTabs}</div>
+        ${sorted.length
+          ? `<div class="request-list">${sorted.map(requestCardHtml).join("")}</div>`
+          : `<div class="empty" style="padding:40px 20px">
+               <div class="big">${requestTab === "closed" ? "🗂️" : "✅"}</div>
+               <p style="margin:0">${requestTab === "closed" ? "Nothing archived yet." : "No open requests — you're all caught up."}</p>
+             </div>`}
       </div>`;
   }
 
   function wireRequests() {
+    app.querySelectorAll("[data-rtab]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        requestTab = btn.dataset.rtab;
+        render();
+      })
+    );
+
     app.querySelectorAll('[id^="rq-file-"]').forEach((input) => {
       if (input.type !== "file") return;
       const i = input.id.replace("rq-file-", "");

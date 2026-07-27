@@ -47,6 +47,18 @@ export const THEMES = [
     blurb: "Clean light mode",
     swatch: { bg: "#f6f7f9", card: "#eaecf1", accent: "#111318" },
   },
+  {
+    id: "terminal",
+    name: "Terminal",
+    blurb: "Green phosphor, monospace, hard corners",
+    swatch: { bg: "#000603", card: "#0a2618", accent: "#22c55e" },
+  },
+  {
+    id: "parchment",
+    name: "Parchment",
+    blurb: "Warm paper stock with serif headings",
+    swatch: { bg: "#f3eee2", card: "#ebe3d1", accent: "#8a4b2a" },
+  },
 ];
 
 export const isTheme = (id) => THEMES.some((t) => t.id === id);

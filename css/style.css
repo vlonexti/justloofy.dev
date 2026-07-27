@@ -176,6 +176,83 @@
   --display: "Space Grotesk", "Inter", system-ui, sans-serif;
 }
 
+/* ---------- Themes that also change the shape of the site ----------
+   These sit AFTER the shared :root block on purpose. Both selectors have
+   the same specificity, so the later one wins — which is what lets these
+   two override --radius and --display and not just the palette. */
+
+/* Green phosphor terminal: monospace, hard corners, no softness anywhere */
+[data-theme="terminal"] {
+  --bg: #000603;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #04180f 0%, #000603 55%);
+  --surface: #04120c;
+  --surface-2: #061a11;
+  --surface-3: #0a2618;
+  --line: rgba(34, 197, 94, 0.18);
+  --line-strong: rgba(34, 197, 94, 0.42);
+  --text: #c8ffdc;
+  --muted: #5cae7c;
+  --dim: #3b7a55;
+
+  --accent: #22c55e;
+  --accent-2: #a3e635;
+  --on-accent: #01120a;
+  --accent-soft: rgba(34, 197, 94, 0.12);
+  --accent-line: rgba(34, 197, 94, 0.5);
+  --accent-grad: linear-gradient(135deg, #22c55e 0%, #a3e635 100%);
+
+  --orb-1: #0a2e1c;
+  --orb-2: #000603;
+  --glow: rgba(34, 197, 94, 0.18);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.75);
+
+  --display: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 3px;
+  --radius-lg: 5px;
+  --radius-pill: 5px;
+}
+[data-theme="terminal"] h1,
+[data-theme="terminal"] h2,
+[data-theme="terminal"] h3 { letter-spacing: -0.02em; }
+[data-theme="terminal"] .btn { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.84rem; }
+
+/* Warm printed paper: serif headings, cream stock, ink-brown accent */
+[data-theme="parchment"] {
+  --bg: #f3eee2;
+  --bg-grad: radial-gradient(120% 80% at 50% -10%, #fbf8f1 0%, #ece5d6 60%);
+  --surface: #fffdf8;
+  --surface-2: #f7f2e6;
+  --surface-3: #ebe3d1;
+  --line: rgba(80, 60, 30, 0.15);
+  --line-strong: rgba(80, 60, 30, 0.32);
+  --text: #2a2318;
+  --muted: #6a5e4b;
+  --dim: #998c77;
+
+  --accent: #8a4b2a;
+  --accent-2: #b8763f;
+  --on-accent: #fffdf8;
+  --accent-soft: rgba(138, 75, 42, 0.1);
+  --accent-line: rgba(138, 75, 42, 0.35);
+  --accent-grad: linear-gradient(135deg, #8a4b2a 0%, #b8763f 100%);
+
+  --orb-1: #e4dac3;
+  --orb-2: #f3eee2;
+  --glow: rgba(138, 75, 42, 0.14);
+  --shadow: 0 18px 44px rgba(80, 60, 30, 0.16);
+
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+[data-theme="parchment"] h1,
+[data-theme="parchment"] h2 { letter-spacing: -0.015em; }
+
+/* The starfield is drawn in --text, which on a light background would be
+   a scatter of dark specks. Light themes simply don't get one. */
+[data-theme="daylight"] .stars,
+[data-theme="parchment"] .stars { display: none; }
+
 /* ---------- Base ---------- */
 
 *,
@@ -1285,6 +1362,8 @@ select option { background: var(--surface-2); color: var(--text); }
   padding: 16px;
   margin-top: 2px;
 }
+/* The sent-brief variant is a <details>, which draws its own chrome */
+.request-block.collapse { padding: 0; background: var(--surface-2); }
 .request-block .field:last-of-type { margin-bottom: 14px; }
 
 .request-head {
@@ -1317,12 +1396,51 @@ select option { background: var(--surface-2); color: var(--text); }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-2);
-  padding: 20px;
   transition: opacity 0.2s ease;
 }
 /* Finished jobs sink and fade, but stay reachable — the buyer still has it */
 .request-card.is-closed { opacity: 0.55; }
 .request-card.is-closed:hover { opacity: 1; }
+
+/* ---------- Collapsible sections ---------- */
+
+.collapse {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.collapse > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.18s ease;
+}
+.collapse > summary::-webkit-details-marker { display: none; }
+.collapse > summary:hover { background: var(--surface-3); }
+.collapse-title { min-width: 0; flex: 1; }
+.collapse-title b { display: block; font-size: 0.95rem; }
+.collapse-title small {
+  display: block;
+  color: var(--dim);
+  font-size: 0.77rem;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.collapse-caret {
+  color: var(--muted);
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.collapse[open] > summary .collapse-caret { transform: rotate(180deg); }
+.collapse[open] > summary { border-bottom: 1px solid var(--line); }
+.collapse-body { padding: 18px 16px; }
 
 /* The "your build is ready" strip in the buyer's library */
 .delivery-box {

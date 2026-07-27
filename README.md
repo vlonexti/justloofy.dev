@@ -40,7 +40,26 @@ served from `justloofy.dev` (see "Changing the domain" below).
 
 ---
 
-## ⚠️ Latest migration — run `upgrade-v4.sql`
+## ⚠️ Latest migration — run `upgrade-v5.sql`
+
+[`supabase/upgrade-v5.sql`](supabase/upgrade-v5.sql) is hardening. A request
+brief is the only free text in the store that a *customer* writes and *you*
+later read in the admin panel, so it's now checked in the database as well as
+in the browser — browser validation is bypassable by calling the API directly.
+
+- Length caps on the brief title, details, game and your note back, plus on
+  account credentials. Stops anyone bloating your free-tier database.
+- **Reference links must be `http(s)`.** Without this, a buyer could store a
+  `javascript:` URL that would run in *your* admin session the moment you
+  clicked it. The site now refuses to render those regardless; the constraint
+  stops them ever being stored.
+
+If a constraint fails to apply, you have existing rows breaking the rule — the
+file ends with a query to find them.
+
+---
+
+## Earlier migration — `upgrade-v4.sql`
 
 [`supabase/upgrade-v4.sql`](supabase/upgrade-v4.sql) adds the **Closed** status
 for requests, and fixes `delivered_at` so it's stamped the moment a build is
@@ -347,7 +366,15 @@ not); the choice is saved in their browser and applied before first paint, so
 there's no flash on reload.
 
 Shipped themes: **Void** (default, monochrome), **Ember** (red/orange),
-**Aurora**, **Nebula**, **Sakura**, and **Daylight** (light mode).
+**Aurora**, **Nebula**, **Sakura**, **Daylight** (light mode), **Terminal**
+and **Parchment**.
+
+The last two change more than the palette — they override `--radius` and
+`--display` too, so Terminal is monospace with hard 3px corners and uppercase
+buttons, and Parchment is serif on cream paper. That works because those two
+blocks sit *after* the shared `:root` block in the stylesheet; both selectors
+have the same specificity, so whichever comes last wins. **A new theme that
+wants to change shape as well as colour has to go after that block too.**
 
 To add one: append a block to the theme list at the top of
 [`css/style.css`](css/style.css) and an entry to `THEMES` in
@@ -399,6 +426,25 @@ supabase/upgrade-v4.sql             migration: closing requests
 supabase/functions/                 the three Stripe edge functions
 CNAME                               tells GitHub Pages about justloofy.dev
 ```
+
+## Security notes
+
+- **Content Security Policy.** `index.html` carries a CSP limiting the page to
+  the origins it actually needs (Supabase API/storage/websocket, esm.sh, Google
+  Fonts). Anything injected that tries to call somewhere else is blocked by the
+  browser. If you ever add a new third-party script or API, you must add its
+  origin to that `<meta>` tag or it will silently fail.
+- **The theme bootstrap lives in [`js/boot.js`](js/boot.js), not inline.** An
+  inline script would need a CSP hash that breaks the moment anyone edits it.
+- **Clickjacking.** `frame-ancestors` and `X-Frame-Options` only work as real
+  HTTP headers, which GitHub Pages won't send, so `boot.js` hides the page and
+  tries to break out if the store is loaded inside someone else's frame.
+- **Buyer-supplied links are sanitised at render time**, not just on input —
+  see `safeUrl()` in [`js/ui.js`](js/ui.js). A blocked link shows you a warning
+  in the admin panel instead of silently vanishing.
+- **Every purchase is created by one database function** (`grant_product`), so
+  there is no code path that hands out a product without recording payment, and
+  account stock can't be double-sold.
 
 ## "My keys are visible on GitHub — is that safe?"
 

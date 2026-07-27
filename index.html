@@ -14,13 +14,29 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <script>
-    // Apply the saved theme before first paint so there is never a flash.
-    try {
-      var t = localStorage.getItem("justloofy-theme");
-      if (t) document.documentElement.setAttribute("data-theme", t);
-    } catch (e) {}
-  </script>
+
+  <!--
+    Locks the page down to the handful of origins it actually needs:
+    Supabase (API, storage, realtime websocket), esm.sh (the Supabase
+    client), and Google Fonts. Anything injected that tries to phone
+    somewhere else is refused by the browser.
+
+    Note: frame-ancestors and X-Frame-Options only work as real HTTP
+    headers, which GitHub Pages won't send — js/boot.js handles framing.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    form-action 'self';
+    script-src 'self' https://esm.sh;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: blob: https:;
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://esm.sh;
+  ">
+
+  <script src="js/boot.js"></script>
 </head>
 <body>
   <div id="site-header"></div>

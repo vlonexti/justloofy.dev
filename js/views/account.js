@@ -3,7 +3,9 @@ import {
   getDownloadUrl, getRequestDownloadUrl, createRequest, updateRequestBrief,
   createBillingPortal, KINDS, kindOf, isSubActive, REQUEST_STATUS,
 } from "../db.js";
-import { mediaHtml, money, esc, toast, formatDate, intervalLabel, pageTitle } from "../ui.js";
+import { mediaHtml, money, esc, toast, formatDate, intervalLabel, pageTitle, safeUrl } from "../ui.js";
+
+const CARET = `<span class="collapse-caret">▾</span>`;
 
 /** The brief form, or the state of the commission once it's been sent. */
 function requestBlockHtml(purchase, request, index) {
@@ -27,12 +29,13 @@ function requestBlockHtml(purchase, request, index) {
         </div>
         <div class="field">
           <label for="r-details-${index}">The details</label>
-          <textarea id="r-details-${index}" name="details" required
+          <textarea id="r-details-${index}" name="details" required maxlength="4000"
                     placeholder="Features, how it should behave, anything it must not do, deadlines..."></textarea>
         </div>
         <div class="field">
           <label for="r-ref-${index}">Reference link (optional)</label>
-          <input id="r-ref-${index}" name="reference" type="url" placeholder="https://youtu.be/... a clip of what you mean">
+          <input id="r-ref-${index}" name="reference" type="url" maxlength="500"
+                 pattern="https?://.+" placeholder="https://youtu.be/... a clip of what you mean">
         </div>
         <button class="btn btn-primary btn-sm" type="submit">Send the brief</button>
       </form>`;
@@ -43,16 +46,26 @@ function requestBlockHtml(purchase, request, index) {
   // The build is what matters, not the label on it — if a file has been
   // attached, the buyer can download it whatever the status says.
   const delivered = Boolean(request.file_path);
+  const link = safeUrl(request.reference_url);
+
+  // Collapsed by default once there's nothing left to do, so a library full
+  // of finished commissions stays scannable. A ready build keeps it open.
+  const startOpen = delivered || editable;
 
   return `
-    <div class="request-block" data-i="${index}">
-      <div class="request-head">
-        <b>${esc(request.title)}</b>
+    <details class="collapse request-block" data-i="${index}" ${startOpen ? "open" : ""}>
+      <summary>
+        <span class="collapse-title">
+          <b>${esc(request.title)}</b>
+          <small>${delivered ? "📦 Build ready · " : ""}${esc(request.game || "Commission")} · updated ${esc(formatDate(request.updated_at ?? request.created_at))}</small>
+        </span>
         <span class="pill ${status.tone}">${esc(status.label)}</span>
-      </div>
+        ${CARET}
+      </summary>
+      <div class="collapse-body">
       <p class="request-details">${esc(request.details)}</p>
-      ${request.reference_url
-        ? `<p class="field-hint"><a href="${esc(request.reference_url)}" target="_blank" rel="noopener" style="text-decoration:underline">Reference link</a></p>`
+      ${link
+        ? `<p class="field-hint"><a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">Reference link</a></p>`
         : ""}
       ${request.admin_note
         ? `<p class="request-note"><b>Note from me:</b> ${esc(request.admin_note)}</p>`
@@ -87,16 +100,18 @@ function requestBlockHtml(purchase, request, index) {
              </div>
              <div class="field">
                <label for="e-details-${index}">The details</label>
-               <textarea id="e-details-${index}" name="details" required>${esc(request.details)}</textarea>
+               <textarea id="e-details-${index}" name="details" required maxlength="4000">${esc(request.details)}</textarea>
              </div>
              <div class="field">
                <label for="e-ref-${index}">Reference link (optional)</label>
-               <input id="e-ref-${index}" name="reference" type="url" value="${esc(request.reference_url ?? "")}">
+               <input id="e-ref-${index}" name="reference" type="url" maxlength="500"
+                      pattern="https?://.+" value="${esc(request.reference_url ?? "")}">
              </div>
              <button class="btn btn-primary btn-sm" type="submit">Save the brief</button>
            </form>`
         : ""}
-    </div>`;
+      </div>
+    </details>`;
 }
 
 /** One row in the library — what it offers depends on what was bought. */

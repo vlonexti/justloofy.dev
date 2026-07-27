@@ -30,6 +30,23 @@ export const brandHtml = () =>
 export const pageTitle = (section) =>
   section ? `${section} — ${CONFIG.SITE_NAME}` : `${CONFIG.SITE_NAME} — ${CONFIG.SITE_TAGLINE}`;
 
+/**
+ * Only http(s) links survive. A buyer controls the reference link on a
+ * request brief, and that link is rendered in the admin panel — without
+ * this, "javascript:..." in a brief would run in an admin's session the
+ * moment it was clicked. esc() alone does not stop that: it escapes the
+ * quotes around the attribute, not the scheme inside it.
+ */
+export function safeUrl(raw) {
+  if (!raw) return null;
+  try {
+    const url = new URL(String(raw), location.origin);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export const formatDate = (iso) =>
   iso
     ? new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
